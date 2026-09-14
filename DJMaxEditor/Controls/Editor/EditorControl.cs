@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
@@ -421,6 +421,8 @@ namespace DJMaxEditor
 
         #region private defs
 
+        private const int VirtualLeftMargin = EventsRenderer.VirtualNoteWidth / 2 + 4;
+
         private Rectangle _viewablePixels = new Rectangle();
 
         private Rectangle _drawableZone = new Rectangle();
@@ -570,7 +572,7 @@ namespace DJMaxEditor
                     SetZoom(oldZoom);
                     break;
                 case Keys.Control:
-                    ScrollEditorPixel((int)(_viewablePixels.X * _zoom - e.Delta / 4), null);
+                    ScrollEditorPixel(hScrollBar.Value - e.Delta / 4, null);
                     break;
                 default:
                     ScrollEditorPixel(null, (int)(_viewablePixels.Y * _zoom - e.Delta / 4));
@@ -661,7 +663,7 @@ namespace DJMaxEditor
 
         public void UpdateScrollbars() 
         {
-            hScrollBar.Maximum = (int)Math.Floor(_drawableZone.Width * _zoom);
+            hScrollBar.Maximum = (int)Math.Floor((_drawableZone.Width + VirtualLeftMargin) * _zoom);
             hScrollBar.LargeChange = DrawingArea.Width;
             hScrollBar.Value = Math.Min(hScrollBar.Value, Math.Max(hScrollBar.Minimum, hScrollBar.Maximum - hScrollBar.LargeChange));
             hScrollBar.Enabled = hScrollBar.Maximum > hScrollBar.LargeChange;
@@ -671,7 +673,7 @@ namespace DJMaxEditor
             vScrollBar.Value = Math.Min(vScrollBar.Value, Math.Max(vScrollBar.Minimum, vScrollBar.Maximum - vScrollBar.LargeChange));
             vScrollBar.Enabled = vScrollBar.Maximum > vScrollBar.LargeChange;
 
-            _viewablePixels.X = (int)(hScrollBar.Value / _zoom);
+            _viewablePixels.X = (int)(hScrollBar.Value / _zoom) - VirtualLeftMargin;
             _viewablePixels.Y = (int)(vScrollBar.Value / _zoom);
             _viewablePixels.Width = (int)Math.Ceiling((float)DrawingArea.Width / _zoom);
             _viewablePixels.Height = (int)Math.Ceiling((float)DrawingArea.Height / _zoom);

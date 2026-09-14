@@ -1,4 +1,4 @@
-﻿using DJMaxEditor.Controls.Editor.Renderers.Events;
+using DJMaxEditor.Controls.Editor.Renderers.Events;
 using DJMaxEditor.DJMax;
 using System.Collections.Generic;
 using System.Drawing;
@@ -131,7 +131,7 @@ namespace DJMaxEditor.Controls.Editor.Renderers
             int x = eventPosition.X;
             int y = eventPosition.Y;
 
-            int noteWidth = virtualNoteWidth;
+            int noteWidth = VirtualNoteWidth;
             int noteHeight = virtualNoteHeight;
 
             int virtualDuration = eventData.Duration > 6 ? eventData.VirtualDuration : 0;
@@ -168,7 +168,7 @@ namespace DJMaxEditor.Controls.Editor.Renderers
             this.RenderEventDataAtInRect(g, eventData, eventRectangle, eventPosition.X, eventPosition.Y);
         }
 
-        private const int virtualNoteWidth = 120;
+        public const int VirtualNoteWidth = 120;
 
         private const int virtualNoteHeight = 120;
 
