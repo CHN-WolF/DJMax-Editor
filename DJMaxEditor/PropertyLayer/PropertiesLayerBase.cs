@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -27,6 +27,34 @@ namespace DJMaxEditor.PropertyLayer
             }
             set {
                 _eventData.Tick = value;
+            }
+        }
+
+        /// <summary>
+        /// Virtual tick position of the event
+        /// </summary>
+        [Category("Base")]
+        [DisplayName("Virtual tick")]
+        public int VirtualTick {
+            get {
+                return _eventData.VirtualTick;
+            }
+            set {
+                _eventData.VirtualTick = value;
+            }
+        }
+
+        /// <summary>
+        /// Virtual duration of the event
+        /// </summary>
+        [Category("Base")]
+        [DisplayName("Virtual duration")]
+        public ushort VirtualDuration {
+            get {
+                return _eventData.VirtualDuration;
+            }
+            set {
+                _eventData.VirtualDuration = value;
             }
         }
     }

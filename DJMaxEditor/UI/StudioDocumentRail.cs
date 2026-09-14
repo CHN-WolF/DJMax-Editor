@@ -95,7 +95,6 @@ namespace DJMaxEditor.UI
                 {
                     StudioWorkspacePreset.Editing,
                     StudioWorkspacePreset.Preview,
-                    StudioWorkspacePreset.Audio,
                     StudioWorkspacePreset.Compact
                 };
             }
@@ -159,7 +158,6 @@ namespace DJMaxEditor.UI
             };
             AddWorkspaceItem(menu, "EDITING", StudioWorkspacePreset.Editing);
             AddWorkspaceItem(menu, "PREVIEW", StudioWorkspacePreset.Preview);
-            AddWorkspaceItem(menu, "AUDIO", StudioWorkspacePreset.Audio);
             AddWorkspaceItem(menu, "COMPACT", StudioWorkspacePreset.Compact);
             return menu;
         }

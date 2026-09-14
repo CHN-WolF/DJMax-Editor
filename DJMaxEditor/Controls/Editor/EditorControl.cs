@@ -126,12 +126,112 @@ namespace DJMaxEditor
             _mTextBox.KeyPress += TextBoxKeyPressed;
 
             InitializeComponent();
+            InitializeSplitScrollbars();
 
             DrawingArea.BackColor = UI.StudioDesignSystem.Void;
             MouseWheel += DrawingArea_MouseWheel;
             DrawingArea.MouseWheel += DrawingArea_MouseWheel;
 
             SetStyle(ControlStyles.Selectable, true);
+        }
+
+        private void InitializeSplitScrollbars()
+        {
+            _vScrollBarUpper = new VScrollBar
+            {
+                Dock = DockStyle.Fill,
+                Width = 15,
+                LargeChange = 16,
+                SmallChange = 16
+            };
+            _vScrollBarUpper.ValueChanged += vScrollBarUpper_ValueChanged;
+
+            _hScrollBarUpper = new HScrollBar
+            {
+                Height = 15,
+                LargeChange = 16,
+                SmallChange = 16
+            };
+            _hScrollBarUpper.ValueChanged += hScrollBarUpper_ValueChanged;
+            DrawingArea.Controls.Add(_hScrollBarUpper);
+            LayoutUpperHScrollBar();
+
+            var scrollPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+                ColumnCount = 1,
+                RowCount = 2
+            };
+            scrollPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15F));
+            scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+
+            tableLayoutPanel1.Controls.Remove(vScrollBar);
+            vScrollBar.Dock = DockStyle.Fill;
+            scrollPanel.Controls.Add(_vScrollBarUpper, 0, 0);
+            scrollPanel.Controls.Add(vScrollBar, 0, 1);
+            tableLayoutPanel1.Controls.Add(scrollPanel, 1, 0);
+
+            tableLayoutPanel1.ColumnStyles[1].SizeType = SizeType.Absolute;
+            tableLayoutPanel1.ColumnStyles[1].Width = 15F;
+        }
+
+        private void LayoutUpperHScrollBar()
+        {
+            if (_hScrollBarUpper == null)
+            {
+                return;
+            }
+            _hScrollBarUpper.SetBounds(
+                0,
+                Math.Max(0, UpperPaneHeight - _hScrollBarUpper.Height),
+                DrawingArea.Width,
+                _hScrollBarUpper.Height);
+        }
+
+        private void SyncUpperHScrollBar()
+        {
+            if (_hScrollBarUpper == null || _syncingHScrollBars)
+            {
+                return;
+            }
+            _syncingHScrollBars = true;
+            try
+            {
+                SetBarValue(_hScrollBarUpper, hScrollBar.Value);
+            }
+            finally
+            {
+                _syncingHScrollBars = false;
+            }
+        }
+
+        private void hScrollBarUpper_ValueChanged(object sender, EventArgs e)
+        {
+            if (_syncingHScrollBars)
+            {
+                return;
+            }
+            _syncingHScrollBars = true;
+            try
+            {
+                SetBarValue(hScrollBar, _hScrollBarUpper.Value);
+            }
+            finally
+            {
+                _syncingHScrollBars = false;
+            }
+        }
+
+        private void vScrollBarUpper_ValueChanged(object sender, EventArgs e)
+        {
+            if (IsFollowing)
+            {
+                return;
+            }
+            UpdateScrollbars();
+            DrawingArea.Invalidate();
         }
 
         public void SelectAll()
@@ -225,7 +325,7 @@ namespace DJMaxEditor
 
             var eventData = _selectMode.GetEventAtPos(
                 (int)(pictureBoxPoint.X / _zoom) + _viewablePixels.X,
-                (int)(pictureBoxPoint.Y / _zoom) + _viewablePixels.Y
+                ScreenToVirtualY(pictureBoxPoint.Y)
             );
 
             if (eventData != null)
@@ -263,7 +363,7 @@ namespace DJMaxEditor
 
             TrackData trackData = _selectMode.GetTrackAtPos(
                 (int)(pictureBoxPoint.X / _zoom) + _viewablePixels.X,
-                (int)(pictureBoxPoint.Y / _zoom) + _viewablePixels.Y
+                ScreenToVirtualY(pictureBoxPoint.Y)
             );
 
             if (null == trackData)
@@ -331,6 +431,7 @@ namespace DJMaxEditor
 
             hScrollBar.Value = 0;
             vScrollBar.Value = 0;
+            _vScrollBarUpper.Value = 0;
 
             DrawingArea.Width = Math.Max((int)playerData.MaxTick, _drawableZone.Width);
 
@@ -367,6 +468,10 @@ namespace DJMaxEditor
             // Make the top corner stay the same between zooms
             hScrollBar.Value = Math.Max(hScrollBar.Minimum, Math.Min(hScrollBar.Maximum, (int)(hScrollBar.Value * (nZoom / _zoom))));
             vScrollBar.Value = Math.Max(vScrollBar.Minimum, Math.Min(vScrollBar.Maximum, (int)(vScrollBar.Value * (nZoom / _zoom))));
+            if (_vScrollBarUpper != null)
+            {
+                _vScrollBarUpper.Value = Math.Max(_vScrollBarUpper.Minimum, Math.Min(_vScrollBarUpper.Maximum, (int)(_vScrollBarUpper.Value * (nZoom / _zoom))));
+            }
 
             this._zoom = nZoom;
 
@@ -423,7 +528,56 @@ namespace DJMaxEditor
 
         private const int VirtualLeftMargin = EventsRenderer.VirtualNoteWidth / 2 + 4;
 
+        private const int UpperPaneTrackCount = 15;
+
         private Rectangle _viewablePixels = new Rectangle();
+
+        private VScrollBar _vScrollBarUpper;
+
+        private HScrollBar _hScrollBarUpper;
+
+        private bool _syncingHScrollBars;
+
+        private bool _dragUpperPane;
+
+        private int SplitTrackCount
+        {
+            get { return Math.Min(UpperPaneTrackCount, _playerData == null ? 0 : _playerData.Tracks.Count); }
+        }
+
+        private int LowerPaneVirtualTop
+        {
+            get { return SplitTrackCount * EventsRenderer.VirtualTrackheight; }
+        }
+
+        private int UpperPaneHeight
+        {
+            get { return DrawingArea.Height / 2; }
+        }
+
+        private int UpperViewY
+        {
+            get { return _vScrollBarUpper == null ? 0 : (int)(_vScrollBarUpper.Value / _zoom); }
+        }
+
+        private int LowerViewY
+        {
+            get { return (int)(vScrollBar.Value / _zoom); }
+        }
+
+        private int ScreenToVirtualY(int screenY)
+        {
+            if (screenY < UpperPaneHeight)
+            {
+                return (int)(screenY / _zoom) + UpperViewY;
+            }
+            return (int)((screenY - UpperPaneHeight) / _zoom) + LowerPaneVirtualTop + LowerViewY;
+        }
+
+        private static void SetBarValue(ScrollBar bar, int value)
+        {
+            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, value));
+        }
 
         private Rectangle _drawableZone = new Rectangle();
 
@@ -575,7 +729,14 @@ namespace DJMaxEditor
                     ScrollEditorPixel(hScrollBar.Value - e.Delta / 4, null);
                     break;
                 default:
-                    ScrollEditorPixel(null, (int)(_viewablePixels.Y * _zoom - e.Delta / 4));
+                    if (DrawingArea.PointToClient(Cursor.Position).Y < UpperPaneHeight)
+                    {
+                        SetBarValue(_vScrollBarUpper, _vScrollBarUpper.Value - e.Delta / 4);
+                    }
+                    else
+                    {
+                        SetBarValue(vScrollBar, vScrollBar.Value - e.Delta / 4);
+                    }
                     break;
             }
         }
@@ -601,25 +762,61 @@ namespace DJMaxEditor
                 UpdateScrollbars();
             }
 
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
-            g.ScaleTransform(_zoom, _zoom, MatrixOrder.Prepend);
-
-            g.TranslateTransform(-_viewablePixels.X, -_viewablePixels.Y);
-
             if (_playerData == null) {
                 return;
             }
 
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+
             var beatSize = EventData.VirtualTickSize * _playerData.TickPerMinute;
             var blockSize = beatSize / _noteValue;
 
-            TracksRenderer.RenderTracskList(gw, _playerData.Tracks, _viewablePixels, beatSize, blockSize, _playerData.VirtualMaxTick, _drawableZone);
-            
-            _progress.Position = _playerData.VirtualCurrentTick;
-            _progress.Render(gw, _viewablePixels);
+            int upperHeight = UpperPaneHeight;
+            DrawPane(g, gw, 0, upperHeight, 0, UpperViewY, beatSize, blockSize);
+            DrawPane(g, gw, upperHeight, DrawingArea.Height - upperHeight, LowerPaneVirtualTop, LowerViewY, beatSize, blockSize);
+            DrawPaneDivider(g, upperHeight);
+        }
 
-            _selectMode?.Render(gw);
+        private void DrawPane(Graphics g, GraphicsWrapper gw, int screenTop, int screenHeight, int virtualTop, int viewY, int beatSize, int blockSize)
+        {
+            if (screenHeight <= 0) { return; }
+
+            int boundsY = virtualTop + viewY;
+            float translateY = -(boundsY - screenTop / _zoom);
+            var bounds = new Rectangle(
+                _viewablePixels.X,
+                boundsY,
+                _viewablePixels.Width,
+                (int)Math.Ceiling(screenHeight / _zoom));
+
+            GraphicsState state = g.Save();
+            try
+            {
+                g.ResetTransform();
+                g.SetClip(new Rectangle(0, screenTop, DrawingArea.Width, screenHeight));
+                g.ScaleTransform(_zoom, _zoom, MatrixOrder.Prepend);
+                g.TranslateTransform(-_viewablePixels.X, translateY);
+
+                TracksRenderer.RenderTracskList(gw, _playerData.Tracks, bounds, beatSize, blockSize, _playerData.VirtualMaxTick, _drawableZone);
+
+                _progress.Position = _playerData.VirtualCurrentTick;
+                _progress.Render(gw, bounds);
+
+                _selectMode?.Render(gw);
+            }
+            finally
+            {
+                g.Restore(state);
+            }
+        }
+
+        private void DrawPaneDivider(Graphics g, int y)
+        {
+            using (var brush = new SolidBrush(UI.StudioDesignSystem.Border))
+            {
+                g.FillRectangle(brush, 0, y - 1, DrawingArea.Width, 3);
+            }
         }
 
         private void EditorControl_KeyPress(object sender, KeyPressEventArgs e) 
@@ -639,7 +836,7 @@ namespace DJMaxEditor
 
             _selectMode.MouseDoubleClick(
                 (int)(mouseEvent.X / _zoom) + _viewablePixels.X,
-                (int)(mouseEvent.Y / _zoom) + _viewablePixels.Y,                 
+                ScreenToVirtualY(mouseEvent.Y),
                 mouseEvent.Button
             );
         }
@@ -668,13 +865,31 @@ namespace DJMaxEditor
             hScrollBar.Value = Math.Min(hScrollBar.Value, Math.Max(hScrollBar.Minimum, hScrollBar.Maximum - hScrollBar.LargeChange));
             hScrollBar.Enabled = hScrollBar.Maximum > hScrollBar.LargeChange;
 
-            vScrollBar.Maximum = (int)Math.Floor(_drawableZone.Height * _zoom);
-            vScrollBar.LargeChange = DrawingArea.Height;
+            if (_hScrollBarUpper != null)
+            {
+                _hScrollBarUpper.Maximum = hScrollBar.Maximum;
+                _hScrollBarUpper.LargeChange = hScrollBar.LargeChange;
+                _hScrollBarUpper.Enabled = hScrollBar.Enabled;
+                SyncUpperHScrollBar();
+            }
+
+            int upperPaneHeight = UpperPaneHeight;
+            int lowerPaneHeight = Math.Max(1, DrawingArea.Height - upperPaneHeight);
+
+            if (_vScrollBarUpper != null)
+            {
+                _vScrollBarUpper.Maximum = (int)Math.Floor(SplitTrackCount * EventsRenderer.VirtualTrackheight * _zoom);
+                _vScrollBarUpper.LargeChange = Math.Max(1, upperPaneHeight);
+                _vScrollBarUpper.Value = Math.Min(_vScrollBarUpper.Value, Math.Max(_vScrollBarUpper.Minimum, _vScrollBarUpper.Maximum - _vScrollBarUpper.LargeChange));
+                _vScrollBarUpper.Enabled = _vScrollBarUpper.Maximum > _vScrollBarUpper.LargeChange;
+            }
+
+            vScrollBar.Maximum = (int)Math.Floor(Math.Max(0, _drawableZone.Height - SplitTrackCount * EventsRenderer.VirtualTrackheight) * _zoom);
+            vScrollBar.LargeChange = lowerPaneHeight;
             vScrollBar.Value = Math.Min(vScrollBar.Value, Math.Max(vScrollBar.Minimum, vScrollBar.Maximum - vScrollBar.LargeChange));
             vScrollBar.Enabled = vScrollBar.Maximum > vScrollBar.LargeChange;
 
             _viewablePixels.X = (int)(hScrollBar.Value / _zoom) - VirtualLeftMargin;
-            _viewablePixels.Y = (int)(vScrollBar.Value / _zoom);
             _viewablePixels.Width = (int)Math.Ceiling((float)DrawingArea.Width / _zoom);
             _viewablePixels.Height = (int)Math.Ceiling((float)DrawingArea.Height / _zoom);
         }
@@ -691,6 +906,8 @@ namespace DJMaxEditor
 
         private void hScrollBar_ValueChanged(object sender, EventArgs e) 
         {
+            SyncUpperHScrollBar();
+
             if (IsFollowing)
             {
                 return;
@@ -723,12 +940,13 @@ namespace DJMaxEditor
                 e.Button == MouseButtons.Left &&
                     (Control.ModifierKeys == Keys.Alt || activeTool == TimelineTool.Pan))
             {
+                _dragUpperPane = e.Y < UpperPaneHeight;
                 _drag.Start(e.X, e.Y, 0, 0);
                 return;
             }
 
             int virtualX = (int)(e.X / _zoom) + _viewablePixels.X;
-            int virtualY = (int)(e.Y / _zoom) + _viewablePixels.Y;
+            int virtualY = ScreenToVirtualY(e.Y);
 
             if (e.Button == MouseButtons.Left &&
                 activeTool == TimelineTool.Draw &&
@@ -851,8 +1069,13 @@ namespace DJMaxEditor
         {
             _ignoreMouse = true;
             hScrollBar.LargeChange = DrawingArea.Width + 16;
-            vScrollBar.LargeChange = DrawingArea.Height + 16;
             hScrollBar.Value = Math.Max(0, Math.Min(hScrollBar.Value, hScrollBar.Maximum - hScrollBar.LargeChange));
+            if (_vScrollBarUpper != null)
+            {
+                _vScrollBarUpper.LargeChange = UpperPaneHeight + 16;
+                _vScrollBarUpper.Value = Math.Max(0, Math.Min(_vScrollBarUpper.Value, _vScrollBarUpper.Maximum - _vScrollBarUpper.LargeChange));
+            }
+            vScrollBar.LargeChange = (DrawingArea.Height - UpperPaneHeight) + 16;
             vScrollBar.Value = Math.Max(0, Math.Min(vScrollBar.Value, vScrollBar.Maximum - vScrollBar.LargeChange));
         }
 
@@ -865,7 +1088,7 @@ namespace DJMaxEditor
             }
 
             var xx = (int)(e.X / _zoom) + _viewablePixels.X;
-            var yy = (int)(e.Y / _zoom) + _viewablePixels.Y;
+            var yy = ScreenToVirtualY(e.Y);
 
             var shouldReDraw = false;
 
@@ -875,7 +1098,15 @@ namespace DJMaxEditor
                 var newY = e.Y;
                 var xDelta = newX - _drag.X;
                 var yDelta = newY - _drag.Y;
-                ScrollEditorPixel(hScrollBar.Value - xDelta, vScrollBar.Value - yDelta);
+                ScrollEditorPixel(hScrollBar.Value - xDelta, null);
+                if (_dragUpperPane)
+                {
+                    SetBarValue(_vScrollBarUpper, _vScrollBarUpper.Value - yDelta);
+                }
+                else
+                {
+                    SetBarValue(vScrollBar, vScrollBar.Value - yDelta);
+                }
                 _drag.X = newX;
                 _drag.Y = newY;
                 shouldReDraw = true;
@@ -1021,6 +1252,7 @@ namespace DJMaxEditor
         private void DrawingArea_Resize(object sender, EventArgs e)
         {
             UpdateScrollbars();
+            LayoutUpperHScrollBar();
             DrawingArea.Invalidate();
         }
 
