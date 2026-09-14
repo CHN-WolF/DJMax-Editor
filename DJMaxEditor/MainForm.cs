@@ -1,4 +1,4 @@
-﻿// #define ENABLE_EVENT_FORM
+// #define ENABLE_EVENT_FORM
 
 using System;
 using System.Linq;
@@ -490,8 +490,6 @@ namespace DJMaxEditor
             RegisterWorkspaceCommand(
                 "workspace.preview", "Use Preview workspace", StudioWorkspacePreset.Preview);
             RegisterWorkspaceCommand(
-                "workspace.audio", "Use Audio workspace", StudioWorkspacePreset.Audio);
-            RegisterWorkspaceCommand(
                 "workspace.compact", "Use Compact workspace", StudioWorkspacePreset.Compact);
         }
 
@@ -578,27 +576,26 @@ namespace DJMaxEditor
                 switch (preset)
                 {
                     case StudioWorkspacePreset.Editing:
-                        dockPanel.DockLeftPortion = 0.22;
-                        dockPanel.DockRightPortion = 0.26;
-                        dockPanel.DockBottomPortion = 0.20;
+                        dockPanel.DockLeftPortion = 0.14;
+                        dockPanel.DockRightPortion = 0.18;
+                        dockPanel.DockBottomPortion = 0.18;
                         m_notes.Show(dockPanel, DockState.DockLeft);
-                        m_audioList.Show(dockPanel, DockState.DockLeft);
+                        if (m_notes.Pane != null)
+                        {
+                            m_audioList.Show(m_notes.Pane, (IDockContent)null);
+                        }
+                        else
+                        {
+                            m_audioList.Show(dockPanel, DockState.DockLeft);
+                        }
                         m_propertiesForm.Show(dockPanel, DockState.DockRight);
                         m_debugOutput.Show(dockPanel, DockState.DockBottom);
+                        m_notes.Activate();
                         break;
 
                     case StudioWorkspacePreset.Preview:
                         dockPanel.DockRightPortion = 0.40;
                         ShowGameplayPreview();
-                        break;
-
-                    case StudioWorkspacePreset.Audio:
-                        dockPanel.DockRightPortion = 0.36;
-                        dockPanel.DockBottomPortion = 0.22;
-                        m_audioList.Show(dockPanel, DockState.DockRight);
-                        EnsureAudioEngineForm();
-                        m_fmod.Show(dockPanel, DockState.DockRight);
-                        m_debugOutput.Show(dockPanel, DockState.DockBottom);
                         break;
 
                     case StudioWorkspacePreset.Compact:
@@ -915,32 +912,11 @@ namespace DJMaxEditor
             //this.FormBorderStyle = FormBorderStyle.None;
             this.WindowState = FormWindowState.Maximized;
 
-            string configFile = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "layout.config");
-
-            Logs.Write("configFile : {0}", configFile);
-            if (File.Exists(configFile))
-            {
-                Logs.Write("loading config from xml");
-                dockPanel.LoadFromXml(configFile, m_deserializeDockContent);
-            }
-            else
-            {
-                Logs.Write("not found. Loading default");
-                m_editorForm.Show(dockPanel);
-
-                m_debugOutput.Show(dockPanel);
-                m_audioList.Show(dockPanel);
-
-#if ENABLE_EVENT_FORM
-                _eventsForm.Show(dockPanel);
-#else
-                eventsToolStripMenuItem.Visible = false;
+#if !ENABLE_EVENT_FORM
+            eventsToolStripMenuItem.Visible = false;
 #endif
 
-                m_propertiesForm.Show(dockPanel);
-                m_fmod.Show(dockPanel);
-                m_notes.Show(dockPanel);
-            }
+            ApplyWorkspacePreset(StudioWorkspacePreset.Editing);
 
             m_player.OnEvent += Player_OnEvent;
             m_player.OnStatusChange += Player_OnStatusChange;            

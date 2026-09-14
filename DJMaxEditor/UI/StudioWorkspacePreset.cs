@@ -6,7 +6,6 @@ namespace DJMaxEditor.UI
     {
         Editing,
         Preview,
-        Audio,
         Compact
     }
 
