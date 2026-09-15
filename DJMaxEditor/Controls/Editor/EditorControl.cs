@@ -31,6 +31,8 @@ namespace DJMaxEditor
 
         public const float MaxZoom = 2f;
 
+        public const float DefaultZoom = 0.5f;
+
         // template event to add an event in PlayerData
         public EventData TemplateEvent = null;
 
@@ -404,10 +406,7 @@ namespace DJMaxEditor
         public void Bind(EditorDocumentContext document)
         {
             if (document == null) throw new ArgumentNullException("document");
-            if (_documentContext != null)
-            {
-                _documentContext.Selection.SelectionChanged -= SharedSelectionChanged;
-            }
+            UnbindCurrentDocument();
             _documentContext = document;
             UndoManager = document.UndoManager;
             _documentContext.Selection.SelectionChanged += SharedSelectionChanged;
@@ -416,12 +415,26 @@ namespace DJMaxEditor
 
         public void Initialize(PlayerData playerData)
         {
+            UnbindCurrentDocument();
+            _documentContext = null;
+            InitializeCore(playerData, new ChartSelectionService());
+        }
+
+        private void UnbindCurrentDocument()
+        {
             if (_documentContext != null)
             {
                 _documentContext.Selection.SelectionChanged -= SharedSelectionChanged;
             }
-            _documentContext = null;
-            InitializeCore(playerData, new ChartSelectionService());
+            if (_playerData != null)
+            {
+                _playerData.Tracks.EventAdded -= NoteAddedOrRemoved;
+                _playerData.Tracks.EventRemoved -= NoteAddedOrRemoved;
+            }
+            if (UndoManager != null)
+            {
+                UndoManager.OnUndoRedo -= UndoManager_OnUndoRedo;
+            }
         }
 
         private void InitializeCore(PlayerData playerData, ChartSelectionService selection)
@@ -485,6 +498,22 @@ namespace DJMaxEditor
         public float GetZoom()
         {
             return _zoom;
+        }
+
+        /// <summary>
+        /// Next wheel zoom step on a 10%-of-default grid, so the default zoom
+        /// (100%) is always reachable no matter how many wheel events fired.
+        /// </summary>
+        public static float NextZoomStep(float current, int direction)
+        {
+            float gridStep = DefaultZoom / 10f;
+            int gridIndex = (int)Math.Round(current / gridStep) + Math.Sign(direction);
+            float zoom = gridIndex * gridStep;
+            if (Math.Abs(zoom - DefaultZoom) < gridStep / 2f)
+            {
+                zoom = DefaultZoom;
+            }
+            return Math.Min(MaxZoom, Math.Max(MinZoom, zoom));
         }
 
         public void ScrollEditorPixel(int? x = null, int? y = null) 
@@ -606,7 +635,7 @@ namespace DJMaxEditor
 
         private bool _isPlayerPlaying;
 
-        private float _zoom = 0.5f;
+        private float _zoom = DefaultZoom;
 
         private bool _ready = false;
 
@@ -712,18 +741,11 @@ namespace DJMaxEditor
             switch (Control.ModifierKeys)
             {
                 case Keys.Alt:
-                    var oldZoom = _zoom;
-
-                    if (e.Delta > 0) {
-                        oldZoom = oldZoom + 0.1f;
-                    } else if (e.Delta < 0) {
-                        oldZoom = oldZoom - 0.1f;
+                    float nextZoom = NextZoomStep(_zoom, e.Delta);
+                    if (nextZoom != _zoom)
+                    {
+                        SetZoom(nextZoom);
                     }
-
-                    oldZoom = Math.Min(oldZoom, MaxZoom);
-                    oldZoom = Math.Max(oldZoom, MinZoom);
-
-                    SetZoom(oldZoom);
                     break;
                 case Keys.Control:
                     ScrollEditorPixel(hScrollBar.Value - e.Delta / 4, null);
@@ -1219,11 +1241,6 @@ namespace DJMaxEditor
             if (keyData == (Keys.Control | Keys.V))
             {
                 _documentContext.Clipboard.PasteAt(_documentContext.Model.VirtualCurrentTick);
-                return true;
-            }
-            if (keyData == (Keys.Control | Keys.D))
-            {
-                _documentContext.Clipboard.DuplicateSelection(QuantizeVirtualStep);
                 return true;
             }
 

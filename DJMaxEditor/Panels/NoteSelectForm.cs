@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
@@ -20,20 +21,26 @@ namespace DJMaxEditor.Panels
 
         private GraphicsWrapper m_gw = new GraphicsWrapper();
 
-        private NoteListContent CreateNoteFromEventData(string name, EventData eventData)
+        private readonly List<KeyValuePair<string, EventData>> m_templates =
+            new List<KeyValuePair<string, EventData>>();
+
+        private int _lastPreviewSize = -1;
+
+        private NoteListContent CreateNoteFromEventData(string name, EventData eventData, int size)
         {
             NoteListContent basicNote = new NoteListContent();
 
             basicNote.Description = name;
 
-            basicNote.NotePreview = new Bitmap(_SupportSize.X, _SupportSize.Y);
+            basicNote.NotePreview = new Bitmap(size, size);
 
             var g = Graphics.FromImage(basicNote.NotePreview);
 
             var gw = m_gw;
             gw.UpdateGraphics(g);
 
-            g.ScaleTransform(0.5f, 0.5f, MatrixOrder.Prepend);
+            float scale = 0.5f * size / _SupportSize.Y;
+            g.ScaleTransform(scale, scale, MatrixOrder.Prepend);
             m_eventsRenderer.RenderEventDataAtInRect(gw, eventData, new Rectangle(0, 0, 90, 90), 70, 70);
             basicNote.EventData = eventData;
 
@@ -47,17 +54,61 @@ namespace DJMaxEditor.Panels
                 return;
             }
 
+            m_templates.Clear();
+            foreach (var keyvalue in theme.GetTemplates())
+            {
+                m_templates.Add(keyvalue);
+            }
+            _lastPreviewSize = -1;
+
+            RebuildNotes();
+        }
+
+        private void RebuildNotes()
+        {
+            if (m_templates.Count == 0)
+            {
+                return;
+            }
+
+            int size = ComputePreviewSize(m_templates.Count);
+            if (size == _lastPreviewSize && m_notes.Count == m_templates.Count)
+            {
+                return;
+            }
+            _lastPreviewSize = size;
+
             m_notes.Clear();
 
-            foreach (var keyvalue in theme.GetTemplates())
+            foreach (var keyvalue in m_templates)
             {
                 m_notes.Add(this.CreateNoteFromEventData(
                     keyvalue.Key,
-                    keyvalue.Value
+                    keyvalue.Value,
+                    size
                 ));
             }
 
             AvailableNotesList.DataSource = m_notes;
+        }
+
+        private int ComputePreviewSize(int count)
+        {
+            if (count <= 0)
+            {
+                return _SupportSize.Y;
+            }
+
+            int availableHeight = AvailableNotesList.ClientSize.Height - 2;
+            if (availableHeight <= 0)
+            {
+                return _SupportSize.Y;
+            }
+
+            // Shrink the previews when the theme has more notes than fit on one
+            // page, so the whole palette stays visible without scrolling.
+            int perRow = availableHeight / count;
+            return Math.Max(24, Math.Min(_SupportSize.Y, perRow - 4));
         }
 
         internal NoteSelectForm(EventsRenderer eventsRenderer) 
@@ -66,6 +117,7 @@ namespace DJMaxEditor.Panels
             InitializeComponent();
 
             m_eventsRenderer = eventsRenderer;
+            AvailableNotesList.SizeChanged += delegate { RebuildNotes(); };
         }
 
         public void SelectEvent(byte index) 

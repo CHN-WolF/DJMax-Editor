@@ -1,4 +1,4 @@
-﻿namespace DJMaxEditor
+namespace DJMaxEditor
 {
     partial class MainForm
     {
@@ -400,7 +400,7 @@
             // UpdateTimer
             // 
             this.UpdateTimer.Enabled = true;
-            this.UpdateTimer.Interval = 10;
+            this.UpdateTimer.Interval = 5;
             this.UpdateTimer.Tick += new System.EventHandler(this.UpdateTimer_Tick);
             // 
             // LongIntervaleTimer
@@ -581,7 +581,7 @@
             // PlayerTimer
             // 
             this.PlayerTimer.Enabled = true;
-            this.PlayerTimer.Interval = 16;
+            this.PlayerTimer.Interval = 8;
             this.PlayerTimer.Tick += new System.EventHandler(this.PlayerTimer_Tick);
             // 
             // dockPanel

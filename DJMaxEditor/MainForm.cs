@@ -121,7 +121,7 @@ namespace DJMaxEditor
 
         public void Editor_OnSelectItem(object sender, EventData[] selectedItems)
         {
-            if (null == selectedItems)
+            if (null == selectedItems || selectedItems.Length < 1)
             {
                 m_selectedEvent = null;
                 m_propertiesForm.PropertyObject = null;
@@ -129,19 +129,56 @@ namespace DJMaxEditor
                 return;
             }
 
-            if (selectedItems.Count() != 1)
+            if (selectedItems.Length > 1)
             {
                 m_selectedEvent = null;
-                m_propertiesForm.PropertyObject = null;
-                m_audioList.List.ClearSelection();
-                return;
-            }
 
-            if (selectedItems.Count() < 1)
-            {
-                m_selectedEvent = null;
-                m_propertiesForm.PropertyObject = null;
-                m_audioList.List.ClearSelection();
+                if (_documentContext != null &&
+                    selectedItems.All(item => item.EventType == EventType.Note))
+                {
+                    m_propertiesForm.PropertyObject = new MultiNotePropertiesLayer(
+                        selectedItems,
+                        _documentContext.Edits);
+
+                    InstrumentData sharedInstrument = selectedItems[0].Instrument;
+                    if (selectedItems.All(item => object.ReferenceEquals(item.Instrument, sharedInstrument)))
+                    {
+                        SelectInstrumentRow(sharedInstrument);
+                    }
+                    else
+                    {
+                        m_audioList.List.ClearSelection();
+                    }
+                }
+                else if (_documentContext != null &&
+                    selectedItems.All(item => item.EventType == EventType.Volume))
+                {
+                    m_propertiesForm.PropertyObject = new MultiVolumePropertiesLayer(
+                        selectedItems,
+                        _documentContext.Edits);
+                    m_audioList.List.ClearSelection();
+                }
+                else if (_documentContext != null &&
+                    selectedItems.All(item => item.EventType == EventType.Tempo))
+                {
+                    m_propertiesForm.PropertyObject = new MultiTempoPropertiesLayer(
+                        selectedItems,
+                        _documentContext.Edits);
+                    m_audioList.List.ClearSelection();
+                }
+                else if (_documentContext != null &&
+                    selectedItems.All(item => item.EventType == EventType.Beat))
+                {
+                    m_propertiesForm.PropertyObject = new MultiBeatPropertiesLayer(
+                        selectedItems,
+                        _documentContext.Edits);
+                    m_audioList.List.ClearSelection();
+                }
+                else
+                {
+                    m_propertiesForm.PropertyObject = null;
+                    m_audioList.List.ClearSelection();
+                }
                 return;
             }
 
@@ -149,8 +186,12 @@ namespace DJMaxEditor
             UpdateAttributesBinding(firstEvent);
 
             // Check the selected note instrument
-            InstrumentData instrumentData = firstEvent.Instrument;
+            SelectInstrumentRow(firstEvent.Instrument);
 
+        }
+
+        private void SelectInstrumentRow(InstrumentData instrumentData)
+        {
             if (instrumentData != null)
             {
                 var row = m_audioList.List.Rows.Cast<DataGridViewRow>().SingleOrDefault(r => r.DataBoundItem == instrumentData);
@@ -165,7 +206,6 @@ namespace DJMaxEditor
             {
                 m_audioList.List.ClearSelection();
             }
-            
         }
 
         public void NoteSelect_OnSelectData(EventData eventData)
@@ -265,15 +305,11 @@ namespace DJMaxEditor
             
             m_notes = new NoteSelectForm(editor.EventsRenderer);
 
-            editor.OnSelectItem += Editor_OnSelectItem;
+            WireEditorForm(m_homeForm);
 
             m_notes.OnSelectDataEvent += NoteSelect_OnSelectData;
 
-            editor.OnRequestEvent += Editor_OnRequestEvent;
-
             m_audioList.List.SelectionChanged += AudioList_selectionChanged;
-
-            editor.OnUndoRedo += UndoManager_OnUndoRedo;
 
             var eventsThemeList = editor.EventsThemeList;
             var currentTheme = editor.CurrentEventsTheme;
@@ -322,14 +358,7 @@ namespace DJMaxEditor
 
             ApplyStudioShell();
             RegisterStudioCommands();
-            m_editorForm.OpenRequested += delegate
-            {
-                openToolStripMenuItem_Click(this, EventArgs.Empty);
-            };
-            m_editorForm.ActiveSurfaceChanged += delegate
-            {
-                UpdateStudioRails();
-            };
+            dockPanel.ActiveDocumentChanged += delegate { ActivateDockedDocument(); };
             AllowDrop = true;
         }
 
@@ -347,6 +376,17 @@ namespace DJMaxEditor
                 ApplyWorkspacePreset(e.Preset);
             };
             m_documentRail.CommandPaletteRequested += delegate { ShowCommandPalette(); };
+            m_documentRail.OpenRequested += delegate { openToolStripMenuItem_Click(this, EventArgs.Empty); };
+            m_documentRail.SaveRequested += delegate { SaveCurrentDocument(); };
+            m_documentRail.SaveAsRequested += delegate { saveAsToolStripMenuItem_Click(this, EventArgs.Empty); };
+            m_documentRail.UndoRequested += delegate { undoToolStripMenuItem_Click(this, EventArgs.Empty); };
+            m_documentRail.RedoRequested += delegate { redoToolStripMenuItem_Click(this, EventArgs.Empty); };
+            m_documentRail.FollowPlaybackRequested += delegate
+            {
+                SetFollowPlayback(!m_editorForm.Editor.FollowTracksProgressWhilePlaying);
+            };
+            m_documentRail.ZoomResetRequested += delegate { m_editorForm.ResetActiveZoom(); };
+            resetZoomToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.D0;
 
             m_studioTopHost = new TableLayoutPanel
             {
@@ -410,6 +450,7 @@ namespace DJMaxEditor
             StudioTheme.ApplyToForm(m_fmod);
             StudioTheme.ApplyToForm(m_notes);
             StudioTheme.ApplyToForm(m_preview);
+            SetFollowPlayback(m_editorForm.Editor.FollowTracksProgressWhilePlaying);
             UpdateStudioRails();
         }
 
@@ -427,8 +468,23 @@ namespace DJMaxEditor
             AddToolButton(TimelineTool.Select, "V  SELECT");
             AddToolButton(TimelineTool.Draw, "B  DRAW");
             AddToolButton(TimelineTool.Erase, "E  ERASE");
-            AddToolButton(TimelineTool.Resize, "R  RESIZE");
             AddToolButton(TimelineTool.Pan, "H  PAN");
+
+            toolStrip1.Items.Add(new ToolStripSeparator());
+            var resetButton = new ToolStripButton("R  RESET")
+            {
+                AutoSize = false,
+                DisplayStyle = ToolStripItemDisplayStyle.Text,
+                Font = StudioTheme.StrongFont(7.75f),
+                ForeColor = StudioTheme.MutedText,
+                Height = 28,
+                Margin = new Padding(2, 1, 2, 1),
+                Width = 68,
+                ToolTipText = "Reset zoom to 100%"
+            };
+            resetButton.Click += delegate { m_editorForm.ResetActiveZoom(); };
+            toolStrip1.Items.Add(resetButton);
+
             SetActiveTool(TimelineTool.Select);
         }
 
@@ -461,6 +517,10 @@ namespace DJMaxEditor
                 StudioCommandContext.Global, () => true, () => string.Empty,
                 () => openToolStripMenuItem_Click(this, EventArgs.Empty)));
             m_commands.Register(new StudioCommand(
+                "document.save", "Save chart", "Document", Keys.Control | Keys.S,
+                StudioCommandContext.Document, () => _documentContext != null,
+                () => "Open a chart before saving.", () => SaveCurrentDocument()));
+            m_commands.Register(new StudioCommand(
                 "document.save-as", "Save chart as", "Document", Keys.Control | Keys.Shift | Keys.S,
                 StudioCommandContext.Document, () => _documentContext != null,
                 () => "Open a chart before saving.", () => saveAsToolStripMenuItem_Click(this, EventArgs.Empty)));
@@ -483,8 +543,12 @@ namespace DJMaxEditor
             RegisterToolCommand("tool.select", "Select tool", Keys.V, TimelineTool.Select);
             RegisterToolCommand("tool.draw", "Draw tool", Keys.B, TimelineTool.Draw);
             RegisterToolCommand("tool.erase", "Erase tool", Keys.E, TimelineTool.Erase);
-            RegisterToolCommand("tool.resize", "Resize tool", Keys.R, TimelineTool.Resize);
             RegisterToolCommand("tool.pan", "Pan tool", Keys.H, TimelineTool.Pan);
+            m_commands.Register(new StudioCommand(
+                "view.reset-zoom", "Reset zoom", "View", Keys.R,
+                StudioCommandContext.Timeline, () => _documentContext != null,
+                () => "Open a chart before resetting the zoom.",
+                () => m_editorForm.ResetActiveZoom()));
             RegisterWorkspaceCommand(
                 "workspace.editing", "Use Editing workspace", StudioWorkspacePreset.Editing);
             RegisterWorkspaceCommand(
@@ -686,7 +750,10 @@ namespace DJMaxEditor
             if (_documentContext == null)
             {
                 m_documentRail.ShowEmpty();
+                m_documentRail.SetDocumentState(false);
+                m_documentRail.SetEditState(false, false);
                 m_statusRail.SetStatus("READY", "SNAP 1/8", "NO DOCUMENT");
+                UpdateZoomDisplay();
                 return;
             }
 
@@ -704,12 +771,17 @@ namespace DJMaxEditor
                 format,
                 capabilityChip,
                 !capabilities.CanEdit);
+            m_documentRail.SetDocumentState(true);
+            m_documentRail.SetEditState(
+                m_undoManager.CanUndo,
+                m_undoManager.CanRedo);
 
             int selected = _documentContext.Selection.Count;
             m_statusRail.SetStatus(
                 selected == 0 ? "READY  •  SELECT TOOL" : selected + " EVENT" + (selected == 1 ? string.Empty : "S") + " SELECTED",
                 toolStripDropDownButton1.Text.ToUpperInvariant(),
                 surface + "  •  " + capabilities.StatusLabel);
+            UpdateZoomDisplay();
         }
 
         private static string GetFormatChipText(DocumentCapabilities capabilities)
@@ -772,7 +844,7 @@ namespace DJMaxEditor
 
         private DeserializeDockContent m_deserializeDockContent;
         private PropertiesForm m_propertiesForm = new PropertiesForm();
-        private EditorForm m_editorForm = new EditorForm();
+        private EditorForm m_homeForm = new EditorForm();
         private DebugOutput m_debugOutput = new DebugOutput();
         private AudioListForm m_audioList;
         //private PerformancesForm m_performances = new PerformancesForm();
@@ -789,9 +861,49 @@ namespace DJMaxEditor
         private StudioCommandPaletteForm m_commandPalette;
         private GameplayPreviewForm m_preview = new GameplayPreviewForm();
         private TableLayoutPanel m_studioTopHost;
-        private EditorDocumentContext _documentContext;
 
-        private UndoManager m_undoManager = UndoManager.GetInstance();
+        private sealed class ChartDocument
+        {
+            public EditorDocumentContext Context { get; set; }
+            public EditorForm Form { get; set; }
+            public bool IsDirty { get; set; }
+        }
+
+        private readonly List<ChartDocument> _documents = new List<ChartDocument>();
+        private readonly HashSet<EditorForm> _wiredEditorForms = new HashSet<EditorForm>();
+        private ChartDocument _activeDocument;
+        private bool _closingAll;
+
+        private EditorForm m_editorForm
+        {
+            get { return _activeDocument != null ? _activeDocument.Form : m_homeForm; }
+        }
+
+        private EditorDocumentContext _documentContext
+        {
+            get { return _activeDocument != null ? _activeDocument.Context : null; }
+        }
+
+        private UndoManager m_undoManager
+        {
+            get {
+                return _activeDocument != null
+                    ? _activeDocument.Context.UndoManager
+                    : UndoManager.GetInstance();
+            }
+        }
+
+        private readonly PlayerData m_emptyPlayerData = new PlayerData();
+
+        private PlayerData m_playerData
+        {
+            get { return _activeDocument != null ? _activeDocument.Context.Model : m_emptyPlayerData; }
+        }
+
+        private IEventRenderer m_currentEventsTheme;
+        private IZoneRenderer m_currentZonesTheme;
+        private int m_quantizeNoteValue;
+        private int m_lastZoomPercent = -1;
 
 #if ENABLE_EVENT_FORM
         private EventsListForm _eventsForm = new  EventsListForm();
@@ -810,8 +922,6 @@ namespace DJMaxEditor
 
         // the audio player
         private IAudioPlayer m_audioPlayer = new AudioPlayerFmodEx();
-
-        private PlayerData m_playerData = new PlayerData();
 
         private EventData m_selectedEvent = null;
 
@@ -882,10 +992,10 @@ namespace DJMaxEditor
             // then try to update the current instrument
             eventData.Instrument = instrumentData;
 
-            // if a note is selected, update it's instrument
-            if (m_selectedEvent != null && m_selectedEvent.Instrument != instrumentData)
+            // update the instrument on every selected event (single or multi selection)
+            if (_documentContext != null && _documentContext.Selection.Count > 0)
             {
-                m_undoManager.ExecAction(new SetSoundAction(m_selectedEvent, instrumentData));
+                _documentContext.Edits.SetSelectionInstrument(instrumentData);
             }
         }
 
@@ -997,9 +1107,7 @@ namespace DJMaxEditor
             }
 
             bool readOnly = playerData != null && playerData.IsReadOnly;
-            this.Text = String.Format("{0} - {1}{2}", APP_NAME, filename, readOnly ? "   [READ-ONLY]" : "");
-
-            m_editorForm.Title = readOnly ? filename + "  (read-only)" : filename;
+            string displayName = Path.GetFileName(filename);
 
             if (readOnly)
             {
@@ -1007,39 +1115,289 @@ namespace DJMaxEditor
                     filename + " opened read-only (source=" + playerData.SourceFormat + ")");
             }
 
-            m_playerData = playerData;
+            // A chart that is already open gets its tab activated instead of a duplicate.
+            ChartDocument existing = _documents.Find(doc =>
+                string.Equals(doc.Context.SourcePath, filename, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                existing.Form.Show(dockPanel, DockState.Document);
+                existing.Form.Activate();
+                SetActiveDocument(existing);
+                return;
+            }
 
-            this.m_audioPlayer.StopAllSounds();
-            m_player.LoadPlayerData(playerData);
+            var context = new EditorDocumentContext(playerData, filename, new UndoManager());
+            var document = new ChartDocument { Context = context };
 
-            m_audioList.List.DataSource = playerData.Instruments;
+            EditorForm form;
+            if (_documents.Count == 0 && m_homeForm != null && !m_homeForm.IsDisposed)
+            {
+                form = m_homeForm;
+                m_homeForm = null;
+            }
+            else
+            {
+                form = CreateDocumentForm();
+            }
+            document.Form = form;
+            _documents.Add(document);
 
-#if ENABLE_EVENT_FORM
-            _eventsForm.SetPlayerData(playerData);
-#endif
+            context.Selection.SelectionChanged += DocumentSelectionChanged;
+            context.Interaction.ToolChanged += DocumentToolChanged;
 
+            form.Bind(context);
+            form.Title = readOnly ? displayName + "  (read-only)" : displayName;
+            if (!form.Visible)
+            {
+                form.Show(dockPanel, DockState.Document);
+            }
+            form.Activate();
+
+            SetActiveDocument(document);
+        }
+
+        private void WireEditorForm(EditorForm form)
+        {
+            if (form == null || !_wiredEditorForms.Add(form))
+            {
+                return;
+            }
+            form.OpenRequested += delegate { openToolStripMenuItem_Click(this, EventArgs.Empty); };
+            form.ActiveSurfaceChanged += delegate { UpdateStudioRails(); };
+            form.FormClosing += DocumentForm_FormClosing;
+            form.FormClosed += DocumentForm_FormClosed;
+            var editor = form.Editor;
+            editor.OnSelectItem += Editor_OnSelectItem;
+            editor.OnRequestEvent += Editor_OnRequestEvent;
+            editor.OnUndoRedo += UndoManager_OnUndoRedo;
+        }
+
+        private EditorForm CreateDocumentForm()
+        {
+            var form = new EditorForm(FeatureFlags.UseTimelineV2);
+            WireEditorForm(form);
+            if (m_currentEventsTheme != null)
+            {
+                form.Editor.CurrentEventsTheme = m_currentEventsTheme;
+            }
+            if (m_currentZonesTheme != null)
+            {
+                form.Editor.CurrentZonesTheme = m_currentZonesTheme;
+            }
+            if (m_quantizeNoteValue > 0)
+            {
+                form.Editor.NoteValue = m_quantizeNoteValue;
+            }
+            form.Editor.FollowTracksProgressWhilePlaying =
+                follwTrackPrgressToolStripMenuItem.Checked;
+            return form;
+        }
+
+        private void ActivateDockedDocument()
+        {
+            ChartDocument document = _documents.Find(doc =>
+                object.ReferenceEquals(doc.Form, dockPanel.ActiveDocument));
+            if (document != null)
+            {
+                SetActiveDocument(document);
+            }
+        }
+
+        private void SetActiveDocument(ChartDocument document)
+        {
+            if (object.ReferenceEquals(_activeDocument, document))
+            {
+                return;
+            }
+
+            m_audioPlayer.StopAllSounds();
+            _activeDocument = document;
+            m_lastPlaybackVirtualTick = -1;
+
+            if (document == null)
+            {
+                m_player.LoadPlayerData(m_emptyPlayerData);
+                m_audioPlayer.SetSoundContext(string.Empty);
+                this.Text = APP_NAME;
+                m_audioList.List.DataSource = null;
+                m_propertiesForm.PropertyObject = null;
+                UpdateStudioRails();
+                return;
+            }
+
+            PlayerData model = document.Context.Model;
+            m_player.LoadPlayerData(model);
+            string soundKey = document.Context.SourcePath ?? string.Empty;
+            m_audioPlayer.SetSoundContext(soundKey);
+            if (!m_audioPlayer.IsSoundContextLoaded(soundKey))
+            {
+                LoadDocumentSounds(model, document.Context.SourcePath);
+                m_audioPlayer.MarkSoundContextLoaded(soundKey);
+            }
+            m_audioList.List.DataSource = model.Instruments;
+            m_propertiesForm.Bind(document.Context);
+            m_preview.Bind(document.Context);
+            ApplyPreviewProfileFromEventTheme();
+            SyncToolButtons(document.Context.Interaction.Tool);
+
+            string displayName = Path.GetFileName(document.Context.SourcePath);
+            bool readOnly = model.IsReadOnly;
+            this.Text = String.Format("{0} - {1}{2}", APP_NAME, displayName, readOnly ? "   [READ-ONLY]" : "");
+            CheckAndUpdatePlayPauseIcons();
+            UpdateStudioRails();
+        }
+
+        private void LoadDocumentSounds(PlayerData playerData, string sourcePath)
+        {
+            string directory = Path.GetDirectoryName(sourcePath);
             for (int i = 0, l = playerData.Instruments.Count; i < l; i++)
             {
                 InstrumentData instrument = playerData.Instruments[i];
+                if (instrument == null || instrument.InsNum == 0)
+                {
+                    continue;
+                }
+
+                bool res = m_audioPlayer.LoadSound(
+                    instrument.InsNum, directory + "\\" + instrument.Name, i == 0 ? 1 : 0);
+                if (!res)
+                {
+                    Logs.Write("Failed to load sound {0} - {1}", instrument.InsNum, instrument.Name);
+                }
+            }
+        }
+
+        private void DocumentForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_closingAll)
+            {
+                return;
             }
 
-            if (_documentContext != null)
+            ChartDocument document = _documents.Find(doc => object.ReferenceEquals(doc.Form, sender));
+            if (document == null || !document.IsDirty)
             {
-                _documentContext.Selection.SelectionChanged -= DocumentSelectionChanged;
-                _documentContext.Interaction.ToolChanged -= DocumentToolChanged;
+                return;
             }
-            _documentContext = new EditorDocumentContext(m_playerData, filename);
-            _documentContext.Selection.SelectionChanged += DocumentSelectionChanged;
-            _documentContext.Interaction.ToolChanged += DocumentToolChanged;
-            m_editorForm.Bind(_documentContext);
-            m_propertiesForm.Bind(_documentContext);
-            m_preview.Bind(_documentContext);
-            ApplyPreviewProfileFromEventTheme();
-            UpdateStudioRails();
+
+            DialogResult result = MessageBox.Show(this,
+                "Save changes to " + Path.GetFileName(document.Context.SourcePath) + "?",
+                "Close chart", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            if (result == DialogResult.Cancel)
+            {
+                e.Cancel = true;
+                return;
+            }
+            if (result == DialogResult.Yes)
+            {
+                SaveDocument(document);
+            }
+            document.IsDirty = false;
+        }
+
+        private bool ConfirmCloseDirtyDocuments()
+        {
+            foreach (ChartDocument document in _documents.ToArray())
+            {
+                if (!document.IsDirty)
+                {
+                    continue;
+                }
+
+                document.Form.Activate();
+                DialogResult result = MessageBox.Show(this,
+                    "Save changes to " + Path.GetFileName(document.Context.SourcePath) + "?",
+                    "DJMax Editor", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (result == DialogResult.Cancel)
+                {
+                    return false;
+                }
+                if (result == DialogResult.Yes)
+                {
+                    SaveDocument(document);
+                }
+                document.IsDirty = false;
+            }
+            _closingAll = true;
+            return true;
+        }
+
+        private void SaveDocument(ChartDocument document)
+        {
+            if (document == null)
+            {
+                return;
+            }
+
+            string sourcePath = document.Context.SourcePath;
+            if (string.IsNullOrEmpty(sourcePath))
+            {
+                document.Form.Activate();
+                saveAsToolStripMenuItem_Click(this, EventArgs.Empty);
+                return;
+            }
+            SaveFile(sourcePath, 0, document.Context.Model);
+        }
+
+        private void DocumentForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            EditorForm form = sender as EditorForm;
+            if (form == null)
+            {
+                return;
+            }
+
+            if (object.ReferenceEquals(form, m_homeForm))
+            {
+                m_homeForm = null;
+                return;
+            }
+
+            ChartDocument document = _documents.Find(doc => object.ReferenceEquals(doc.Form, form));
+            if (document == null)
+            {
+                return;
+            }
+
+            document.Context.Selection.SelectionChanged -= DocumentSelectionChanged;
+            document.Context.Interaction.ToolChanged -= DocumentToolChanged;
+            _documents.Remove(document);
+            m_audioPlayer.ReleaseSoundContext(document.Context.SourcePath ?? string.Empty);
+
+            if (object.ReferenceEquals(_activeDocument, document))
+            {
+                _activeDocument = null;
+                if (_documents.Count > 0)
+                {
+                    ChartDocument next = _documents[_documents.Count - 1];
+                    next.Form.Activate();
+                    SetActiveDocument(next);
+                }
+                else
+                {
+                    SetActiveDocument(null);
+                    ShowHomeForm();
+                }
+            }
+        }
+
+        private void ShowHomeForm()
+        {
+            if (m_homeForm == null || m_homeForm.IsDisposed)
+            {
+                m_homeForm = new EditorForm();
+                WireEditorForm(m_homeForm);
+            }
+            m_homeForm.Show(dockPanel, DockState.Document);
         }
 
         private void DocumentSelectionChanged(object sender, EventArgs e)
         {
+            if (_documentContext == null ||
+                !object.ReferenceEquals(sender, _documentContext.Selection))
+            {
+                return;
+            }
             Editor_OnSelectItem(this, _documentContext.Selection.Items.ToArray());
             UpdateStudioRails();
         }
@@ -1056,8 +1414,9 @@ namespace DJMaxEditor
                 _documentContext.Interaction.Tool.ToString().ToUpperInvariant());
         }
 
-        private void SaveFile(string filename, int filterIndex = 0)
+        private void SaveFile(string filename, int filterIndex = 0, PlayerData model = null)
         {
+            model = model ?? m_playerData;
             var extension = Path.GetExtension(filename).ToLower();
 
             var handler = filterIndex > 0 ?
@@ -1069,10 +1428,10 @@ namespace DJMaxEditor
             }
 
             if (handler is BMESaveFile &&
-                BmsonChartSerializer.ShouldUseForClassicBmsOverflow(m_playerData))
+                BmsonChartSerializer.ShouldUseForClassicBmsOverflow(model))
             {
                 MessageBox.Show(
-                    "This chart needs " + BmsChartSerializer.CountRequiredKeysounds(m_playerData) +
+                    "This chart needs " + BmsChartSerializer.CountRequiredKeysounds(model) +
                     " unique keysounds, but classic BMS only has 1,295 usable IDs.\n\n" +
                     "DJMax Editor will save it as BMSON instead. BMSON keeps every keysound and " +
                     "is supported by Pulsus and BmsONE.",
@@ -1092,11 +1451,11 @@ namespace DJMaxEditor
                 handler = new BmsonSaveFile();
             }
 
-            if (m_playerData != null && m_playerData.IsReadOnly)
+            if (model != null && model.IsReadOnly)
             {
                 MessageBox.Show(
                     "This chart was opened read-only" +
-                    (m_playerData.SourceFormat.HasValue ? " (" + m_playerData.SourceFormat + ")" : "") +
+                    (model.SourceFormat.HasValue ? " (" + model.SourceFormat + ")" : "") +
                     ".\n\nSaving it back is disabled because lossless round-trip and in-game compatibility " +
                     "have not been verified for this format.",
                     "Read-only chart", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1105,8 +1464,8 @@ namespace DJMaxEditor
 
             // Respect V charts are editable in memory, but the legacy Respect/TQ writer is not
             // lossless. Allow the supported conversion path without risking the source container.
-            if (m_playerData != null &&
-                m_playerData.SourceFormat == DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV &&
+            if (model != null &&
+                model.SourceFormat == DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV &&
                 !(handler is BMESaveFile) &&
                 !(handler is BmsonSaveFile))
             {
@@ -1137,7 +1496,7 @@ namespace DJMaxEditor
                 bool ok;
                 try
                 {
-                    ok = handler.Save(filename, m_playerData);
+                    ok = handler.Save(filename, model);
                 }
                 catch (Exception ex)
                 {
@@ -1155,11 +1514,74 @@ namespace DJMaxEditor
                             "see the local diagnostics log.\n\nLog: " + DJMaxEditor.Diagnostics.DiagnosticLog.LogPath,
                             "Save failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
+                    else
+                    {
+                        DJMaxEditor.Diagnostics.DiagnosticLog.Write("save.ok", filename);
+                        SetStudioStatus("SAVED  " + Path.GetFileName(filename).ToUpperInvariant());
+
+                        ChartDocument saved = _documents.Find(doc =>
+                            string.Equals(doc.Context.SourcePath, filename, StringComparison.OrdinalIgnoreCase));
+                        if (saved != null)
+                        {
+                            saved.IsDirty = false;
+                        }
+                        else if (_activeDocument != null &&
+                            object.ReferenceEquals(model, _activeDocument.Context.Model))
+                        {
+                            // Save As to a new path: the document adopts it as its source.
+                            _activeDocument.Context.SetSourcePath(filename);
+                            _activeDocument.IsDirty = false;
+                            _activeDocument.Form.Title = Path.GetFileName(filename);
+                            UpdateStudioRails();
+                        }
+                    }
                 });
             });
             loadDataThread.Start();
             m_loadingForm.DisplayedMessage = "Saving pattern...";
             m_loadingForm.ShowDialog(this);
+        }
+
+        private void SaveCurrentDocument()
+        {
+            if (_activeDocument == null || m_playerData == null)
+            {
+                return;
+            }
+
+            SaveDocument(_activeDocument);
+        }
+
+        private void SetFollowPlayback(bool follow)
+        {
+            m_editorForm.Editor.FollowTracksProgressWhilePlaying = follow;
+            follwTrackPrgressToolStripMenuItem.Checked = follow;
+            if (m_documentRail != null)
+            {
+                m_documentRail.SetFollowPlayback(follow);
+            }
+        }
+
+        private int GetActiveZoomPercent()
+        {
+            if (m_editorForm == null)
+            {
+                return 100;
+            }
+            return (int)Math.Round(m_editorForm.ActiveZoomFactor * 100f);
+        }
+
+        private void UpdateZoomDisplay()
+        {
+            int percent = GetActiveZoomPercent();
+            if (percent != m_lastZoomPercent)
+            {
+                m_lastZoomPercent = percent;
+                if (m_documentRail != null)
+                {
+                    m_documentRail.SetZoomPercent(percent);
+                }
+            }
         }
 
         private IOpenFile GetHandlerForFormat(DJMaxEditor.Files.FormatDetection.ChartFormat format)
@@ -1219,23 +1641,7 @@ namespace DJMaxEditor
             playerData.IsReadOnly = playerData.IsReadOnly || readOnly;
             if (playerData.SourceFormat == null) playerData.SourceFormat = sourceFormat;
 
-            for (int i = 0, l = playerData.Instruments.Count; i < l; i++)
-            {
-                InstrumentData instrument = playerData.Instruments[i];
-
-                if (instrument == null || instrument.InsNum == 0)
-                {
-                    continue;
-                }
-
-                bool res = m_audioPlayer.LoadSound(instrument.InsNum, fi.Directory + "\\" + instrument.Name, i == 0 ? 1 : 0);
-                if (!res)
-                {
-                    Logs.Write("Failed to load sound {0} - {1}", instrument.InsNum, instrument.Name);
-                }
-            }
-
-            ShowOnUi(() => OpenFileComplete(playerData, fi.Name, true));
+            ShowOnUi(() => OpenFileComplete(playerData, fi.FullName, true));
             return true;
         }
 
@@ -1480,6 +1886,7 @@ namespace DJMaxEditor
         private void UpdateTimer_Tick(object sender, EventArgs e)
         {
             m_player.Update();
+            UpdateZoomDisplay();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -1568,10 +1975,14 @@ namespace DJMaxEditor
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
             openFileDialog1.Filter = _loadHandler.GetFilter();
+            openFileDialog1.Multiselect = true;
             DialogResult result = openFileDialog1.ShowDialog();
             if (result == DialogResult.OK)
             {
-                OpenFile(openFileDialog1.FileName, openFileDialog1.FilterIndex);
+                foreach (string name in openFileDialog1.FileNames)
+                {
+                    OpenFile(name, openFileDialog1.FilterIndex);
+                }
             }
         }
 
@@ -1582,12 +1993,7 @@ namespace DJMaxEditor
 
         private void follwTrackPrgressToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            ToolStripMenuItem item = sender as ToolStripMenuItem;
-            if (item != null)
-            {
-                item.Checked = !item.Checked;
-                m_editorForm.Editor.FollowTracksProgressWhilePlaying = item.Checked;
-            }
+            SetFollowPlayback(!m_editorForm.Editor.FollowTracksProgressWhilePlaying);
         }
 
         private void propertiesToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1607,6 +2013,11 @@ namespace DJMaxEditor
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (!_closingAll && !ConfirmCloseDirtyDocuments())
+            {
+                e.Cancel = true;
+                return;
+            }
 
             string configFile = Path.Combine(Path.GetDirectoryName(Application.ExecutablePath), "layout.config");
             //if (m_bSaveLayout)
@@ -1650,7 +2061,7 @@ namespace DJMaxEditor
 
         private void resetZoomToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            m_editorForm.ActiveSurface.TrySetTimeZoom(0.5f);
+            m_editorForm.ResetActiveZoom();
         }
 
         private void saveAsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1698,9 +2109,12 @@ namespace DJMaxEditor
             int value = 1;
             if (Int32.TryParse(stringValue, out value))
             {
-                var editor = m_editorForm.Editor;
-                editor.NoteValue = value;
-                editor.Redraw();
+                m_quantizeNoteValue = value;
+                foreach (EditorForm form in AllEditorForms())
+                {
+                    form.Editor.NoteValue = value;
+                    form.Editor.Redraw();
+                }
             }
         }
 
@@ -1762,7 +2176,6 @@ namespace DJMaxEditor
                 if (File.Exists(file))
                 {
                     OpenFile(file);
-                    break;
                 }
             }
 
@@ -1801,8 +2214,21 @@ namespace DJMaxEditor
                 return;
             }
 
+            ChartDocument edited = _documents.Find(doc =>
+                object.ReferenceEquals(doc.Context.UndoManager, manager));
+            if (edited != null)
+            {
+                edited.IsDirty = true;
+            }
+
             redoToolStripMenuItem.Enabled = manager.CanRedo;
             undoToolStripMenuItem.Enabled = manager.CanUndo;
+            if (m_documentRail != null)
+            {
+                m_documentRail.SetEditState(
+                    _documentContext != null && manager.CanUndo,
+                    _documentContext != null && manager.CanRedo);
+            }
             m_editorForm.ActiveSurface.InvalidateView();
         }
 
@@ -1900,7 +2326,11 @@ namespace DJMaxEditor
                 return;
             }
 
-            m_editorForm.Editor.CurrentEventsTheme = theme;
+            m_currentEventsTheme = theme;
+            foreach (EditorForm form in AllEditorForms())
+            {
+                form.Editor.CurrentEventsTheme = theme;
+            }
             ThemeDropDownButton.Text = "Events theme  " + theme.GetName();
             m_notes.ApplyTheme(theme);
             ApplyPreviewProfileFromEventTheme();
@@ -1913,8 +2343,24 @@ namespace DJMaxEditor
                 return;
             }
 
-            m_editorForm.Editor.CurrentZonesTheme = theme;
+            m_currentZonesTheme = theme;
+            foreach (EditorForm form in AllEditorForms())
+            {
+                form.Editor.CurrentZonesTheme = theme;
+            }
             zoneRendererToolStripDropDownButton.Text = "Zones theme  " + theme.GetName();
+        }
+
+        private IEnumerable<EditorForm> AllEditorForms()
+        {
+            if (m_homeForm != null && !m_homeForm.IsDisposed)
+            {
+                yield return m_homeForm;
+            }
+            foreach (ChartDocument document in _documents)
+            {
+                yield return document.Form;
+            }
         }
 
 
@@ -1995,18 +2441,30 @@ namespace DJMaxEditor
             }
         }
 
+        private int m_lastPlaybackVirtualTick = -1;
+
         private void PlayerTimer_Tick(object sender, EventArgs e)
         {
             var tm = TimeSpan.FromMilliseconds(m_player.GetCurrentMsTime());
             var tick = m_player.GetCurrentTick();
-            var date = new DateTime(tm.Ticks);
 
-            currentProgress.Text = date.ToString("HH:mm:ss") + "  |  TICK " + tick;
+            string progressText = new DateTime(tm.Ticks).ToString("HH:mm:ss") + "  |  TICK " + tick;
+            if (currentProgress.Text != progressText)
+            {
+                currentProgress.Text = progressText;
+            }
 
             if (m_player.IsReady)
             {
                 m_playerData.CurrentTick = tick;
-                m_editorForm.ActiveSurface.PlayheadVirtualTick = m_playerData.VirtualCurrentTick;
+                int virtualTick = m_playerData.VirtualCurrentTick;
+                if (virtualTick != m_lastPlaybackVirtualTick)
+                {
+                    // Invalidate only when the playhead actually advanced; the
+                    // 8 ms timer then costs nothing on ticks it outruns.
+                    m_lastPlaybackVirtualTick = virtualTick;
+                    m_editorForm.ActiveSurface.PlayheadVirtualTick = virtualTick;
+                }
                 m_preview.RefreshPlayback();
             }
         }

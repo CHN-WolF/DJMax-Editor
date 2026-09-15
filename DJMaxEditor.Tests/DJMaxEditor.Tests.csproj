@@ -9,7 +9,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
     <PlatformTarget>x86</PlatformTarget>
     <AssemblyName>DJMaxEditor.Tests</AssemblyName>
     <RootNamespace>DJMaxEditor.Tests</RootNamespace>

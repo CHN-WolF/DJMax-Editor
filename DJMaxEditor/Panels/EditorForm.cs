@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -97,6 +97,33 @@ namespace DJMaxEditor
         public bool IsLegacySurfaceActive
         {
             get { return object.ReferenceEquals(ActiveSurface, _legacySurface); }
+        }
+
+        /// <summary>
+        /// Zoom of the active surface relative to its own default (1.0 = default zoom).
+        /// </summary>
+        public float ActiveZoomFactor
+        {
+            get
+            {
+                if (IsLegacySurfaceActive)
+                {
+                    return editorControl1.GetZoom() / EditorControl.DefaultZoom;
+                }
+                return (float)(_timelineV2Surface.TimeZoom / TimelineViewport.DefaultPixelsPerTick);
+            }
+        }
+
+        public void ResetActiveZoom()
+        {
+            if (IsLegacySurfaceActive)
+            {
+                editorControl1.SetZoom(EditorControl.DefaultZoom);
+            }
+            else
+            {
+                _timelineV2Surface.TrySetTimeZoom((float)TimelineViewport.DefaultPixelsPerTick);
+            }
         }
 
         public string DocumentStatusText

@@ -247,6 +247,65 @@ namespace DJMaxEditor.Tests
                     "duplicate reused the authoritative source event identity");
             });
 
+            Test("ChartClipboard_PastesAcrossDocumentsWithInstrumentRemap", () =>
+            {
+                var sourceModel = EditingModel(1);
+                var sourceSound = new InstrumentData { InsNum = 7, Name = "kick.wav" };
+                sourceModel.Instruments.Add(sourceSound);
+                var sourceItem = AddEditingEvent(sourceModel, 0, 12);
+                sourceItem.Instrument = sourceSound;
+                var source = new EditorDocumentContext(sourceModel, "source.pt", new UndoManager());
+                source.Selection.Replace(new[] { sourceItem });
+
+                var targetModel = EditingModel(1);
+                var targetSound = new InstrumentData { InsNum = 7, Name = "target-kick.wav" };
+                targetModel.Instruments.Add(targetSound);
+                var targetUndo = new UndoManager();
+                var target = new EditorDocumentContext(targetModel, "target.pt", targetUndo);
+
+                AssertTrue(source.Clipboard.CopySelection(), "copy should commit");
+                IList<EventData> pasted = target.Clipboard.PasteAt(120);
+                AssertTrue(pasted.Count == 1, "cross-document paste did not insert the event");
+                AssertTrue(pasted[0].VirtualTick == 12,
+                    "cross-document paste must keep the event at its original position");
+                AssertTrue(object.ReferenceEquals(pasted[0].Instrument, targetSound),
+                    "paste must rebind the instrument owned by the destination document");
+                AssertTrue(targetModel.Tracks.GetTrackAtIndex(0).Events.Contains(pasted[0]),
+                    "pasted event was not added to the destination model");
+
+                targetUndo.Undo();
+                AssertTrue(!targetModel.Tracks.GetTrackAtIndex(0).Events.Any(),
+                    "one undo should remove the cross-document paste");
+            });
+
+            Test("ChartClipboard_PasteAddsMissingInstrumentAndClampsTrack", () =>
+            {
+                var sourceModel = EditingModel(3);
+                var sourceSound = new InstrumentData { InsNum = 9, Name = "snare.wav" };
+                sourceModel.Instruments.Add(sourceSound);
+                var sourceItem = AddEditingEvent(sourceModel, 2, 12);
+                sourceItem.Instrument = sourceSound;
+                var source = new EditorDocumentContext(sourceModel, "source.pt", new UndoManager());
+                source.Selection.Replace(new[] { sourceItem });
+
+                var targetModel = EditingModel(1);
+                var target = new EditorDocumentContext(targetModel, "target.pt", new UndoManager());
+
+                AssertTrue(source.Clipboard.CopySelection(), "copy should commit");
+                IList<EventData> pasted = target.Clipboard.PasteAt(48);
+                AssertTrue(pasted.Count == 1, "paste into a narrower chart was rejected");
+                AssertTrue(pasted[0].TrackId == 0,
+                    "out-of-range track was not clamped to the destination tracks");
+                AssertTrue(pasted[0].Instrument != null &&
+                    !object.ReferenceEquals(pasted[0].Instrument, sourceSound),
+                    "missing instrument must be recreated inside the destination document");
+                AssertTrue(pasted[0].Instrument.InsNum == 9 &&
+                    pasted[0].Instrument.Name == "snare.wav",
+                    "recreated instrument lost its source identity");
+                AssertTrue(targetModel.Instruments.Contains(pasted[0].Instrument),
+                    "recreated instrument was not added to the destination model");
+            });
+
             Test("ChartEdit_InspectorAttributeMutationIsGroupedAndUndoable", () =>
             {
                 var model = EditingModel(1);
@@ -334,6 +393,234 @@ namespace DJMaxEditor.Tests
                     "cancel did not restore the Select tool");
                 AssertTrue(notifications == 2,
                     "tool change and cancel did not both notify the shell");
+            });
+
+            Test("ChartEdit_InspectorBatchPropertiesAreGroupedAndUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var first = AddEditingEvent(model, 0, 12);
+                var second = AddEditingEvent(model, 0, 24);
+                first.Vel = 10;
+                second.Vel = 20;
+                first.Pan = 30;
+                second.Pan = 40;
+                first.Volume = 50;
+                second.Volume = 60;
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second });
+
+                AssertTrue(context.Edits.SetSelectionVel(90),
+                    "batch vel edit should commit");
+                AssertTrue(first.Vel == 90 && second.Vel == 90,
+                    "batch vel edit did not update the complete shared selection");
+                AssertTrue(context.Edits.SetSelectionPan(70),
+                    "batch pan edit should commit");
+                AssertTrue(first.Pan == 70 && second.Pan == 70,
+                    "batch pan edit did not update the complete shared selection");
+                AssertTrue(context.Edits.SetSelectionVolume(100),
+                    "batch volume edit should commit");
+                AssertTrue(first.Volume == 100 && second.Volume == 100,
+                    "batch volume edit did not update the complete shared selection");
+
+                undo.Undo();
+                AssertTrue(first.Volume == 50 && second.Volume == 60,
+                    "one undo should restore each event's original volume");
+                undo.Undo();
+                AssertTrue(first.Pan == 30 && second.Pan == 40,
+                    "one undo should restore each event's original pan");
+                undo.Undo();
+                AssertTrue(first.Vel == 10 && second.Vel == 20,
+                    "one undo should restore each event's original velocity");
+            });
+
+            Test("ChartEdit_InspectorBatchDurationIsGroupedAndSkipsNonNotes", () =>
+            {
+                var model = EditingModel(1);
+                var first = AddEditingEvent(model, 0, 12);
+                var second = AddEditingEvent(model, 0, 24);
+                first.Duration = 2;
+                second.Duration = 4;
+                var tempo = new EventData
+                {
+                    EventType = EventType.Tempo,
+                    VirtualTick = 36
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(tempo);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second, tempo });
+
+                AssertTrue(context.Edits.SetSelectionDuration(8),
+                    "batch duration edit should commit");
+                AssertTrue(first.Duration == 8 && second.Duration == 8,
+                    "batch duration edit did not update every selected note");
+                AssertTrue(first.VirtualDuration == 48,
+                    "duration edit should keep the virtual duration conversion");
+                AssertTrue(tempo.Duration == 6,
+                    "batch duration edit must not touch non-note events");
+
+                undo.Undo();
+                AssertTrue(first.Duration == 2 && second.Duration == 4,
+                    "one undo should restore each note's original duration");
+            });
+
+            Test("ChartEdit_InspectorBatchInstrumentIsGroupedAndUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var first = AddEditingEvent(model, 0, 12);
+                var second = AddEditingEvent(model, 0, 24);
+                var oldSound = new InstrumentData { InsNum = 1, Name = "old" };
+                var newSound = new InstrumentData { InsNum = 2, Name = "new" };
+                first.Instrument = oldSound;
+                second.Instrument = null;
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second });
+
+                AssertTrue(context.Edits.SetSelectionInstrument(newSound),
+                    "batch instrument edit should commit");
+                AssertTrue(object.ReferenceEquals(first.Instrument, newSound) &&
+                    object.ReferenceEquals(second.Instrument, newSound),
+                    "batch instrument edit did not update the complete shared selection");
+
+                undo.Undo();
+                AssertTrue(object.ReferenceEquals(first.Instrument, oldSound) &&
+                    second.Instrument == null,
+                    "one undo should restore each event's original instrument");
+            });
+
+            Test("ChartEdit_InspectorBatchTempoIsGroupedUndoableAndSkipsNonTempo", () =>
+            {
+                var model = EditingModel(1);
+                var first = new EventData
+                {
+                    EventType = EventType.Tempo,
+                    VirtualTick = 12,
+                    Tempo = 120f
+                };
+                var second = new EventData
+                {
+                    EventType = EventType.Tempo,
+                    VirtualTick = 24,
+                    Tempo = 140.5f
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(first);
+                model.Tracks.GetTrackAtIndex(0).AddEvent(second);
+                var note = AddEditingEvent(model, 0, 36);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second, note });
+
+                AssertTrue(context.Edits.SetSelectionTempo(172.5f),
+                    "batch tempo edit should commit");
+                AssertTrue(first.Tempo == 172.5f && second.Tempo == 172.5f,
+                    "batch tempo edit did not update every selected tempo event");
+                AssertTrue(note.Tempo == 140f,
+                    "batch tempo edit must not touch non-tempo events");
+                AssertTrue(!context.Edits.SetSelectionTempo(172.5f),
+                    "assigning the current tempo should report no mutation");
+
+                undo.Undo();
+                AssertTrue(first.Tempo == 120f && second.Tempo == 140.5f,
+                    "one undo should restore each event's original fractional tempo");
+            });
+
+            Test("ChartEdit_InspectorBatchBeatIsGroupedUndoableAndSkipsNonBeat", () =>
+            {
+                var model = EditingModel(1);
+                var first = new EventData
+                {
+                    EventType = EventType.Beat,
+                    VirtualTick = 12,
+                    Beat = 3
+                };
+                var second = new EventData
+                {
+                    EventType = EventType.Beat,
+                    VirtualTick = 24,
+                    Beat = 4
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(first);
+                model.Tracks.GetTrackAtIndex(0).AddEvent(second);
+                var note = AddEditingEvent(model, 0, 36);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second, note });
+
+                AssertTrue(context.Edits.SetSelectionBeat(6),
+                    "batch beat edit should commit");
+                AssertTrue(first.Beat == 6 && second.Beat == 6,
+                    "batch beat edit did not update every selected beat event");
+                AssertTrue(note.Beat == 4,
+                    "batch beat edit must not touch non-beat events");
+                AssertTrue(!context.Edits.SetSelectionBeat(6),
+                    "assigning the current beat should report no mutation");
+
+                undo.Undo();
+                AssertTrue(first.Beat == 3 && second.Beat == 4,
+                    "one undo should restore each event's original beat");
+            });
+
+            Test("ChartEdit_InspectorBatchVolumeAppliesToVolumeEvents", () =>
+            {
+                var model = EditingModel(1);
+                var first = new EventData
+                {
+                    EventType = EventType.Volume,
+                    VirtualTick = 12,
+                    Volume = 80
+                };
+                var second = new EventData
+                {
+                    EventType = EventType.Volume,
+                    VirtualTick = 24,
+                    Volume = 100
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(first);
+                model.Tracks.GetTrackAtIndex(0).AddEvent(second);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { first, second });
+
+                AssertTrue(context.Edits.SetSelectionVolume(127),
+                    "batch volume edit on volume events should commit");
+                AssertTrue(first.Volume == 127 && second.Volume == 127,
+                    "batch volume edit did not update every selected volume event");
+
+                undo.Undo();
+                AssertTrue(first.Volume == 80 && second.Volume == 100,
+                    "one undo should restore each event's original volume");
+            });
+
+            Test("ChartEdit_NoOpBatchPropertyMutationsDoNotCreateUndoEntries", () =>
+            {
+                var model = EditingModel(1);
+                var item = AddEditingEvent(model, 0, 12);
+                item.Vel = 90;
+                item.Pan = 70;
+                item.Volume = 100;
+                item.Duration = 8;
+                var sound = new InstrumentData { InsNum = 1, Name = "sound" };
+                item.Instrument = sound;
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { item });
+
+                AssertTrue(!context.Edits.SetSelectionVel(90),
+                    "assigning the current vel should report no mutation");
+                AssertTrue(!context.Edits.SetSelectionPan(70),
+                    "assigning the current pan should report no mutation");
+                AssertTrue(!context.Edits.SetSelectionVolume(100),
+                    "assigning the current volume should report no mutation");
+                AssertTrue(!context.Edits.SetSelectionDuration(8),
+                    "assigning the current duration should report no mutation");
+                AssertTrue(!context.Edits.SetSelectionInstrument(sound),
+                    "assigning the current instrument should report no mutation");
+                AssertTrue(!context.Edits.SetSelectionInstrument(null),
+                    "a null instrument should be rejected");
+                AssertTrue(!undo.CanUndo,
+                    "no-op batch mutations created an undo entry");
             });
         }
 

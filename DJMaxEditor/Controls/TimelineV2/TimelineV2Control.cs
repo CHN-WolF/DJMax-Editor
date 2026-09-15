@@ -57,7 +57,7 @@ namespace DJMaxEditor.Controls.TimelineV2
                 ControlStyles.Selectable |
                 ControlStyles.UserPaint,
                 true);
-            _coordinates = CreateCoordinates(1f, 0.25);
+            _coordinates = CreateCoordinates(1f, TimelineViewport.DefaultPixelsPerTick);
         }
 
         public Control View
@@ -180,6 +180,16 @@ namespace DJMaxEditor.Controls.TimelineV2
             _coordinates = CreateCoordinates(1f, _viewport.PixelsPerTick);
             Invalidate();
             return true;
+        }
+
+        public float TimeZoom
+        {
+            get
+            {
+                return (float)(_viewport == null
+                    ? _coordinates.PixelsPerTick
+                    : _viewport.PixelsPerTick);
+            }
         }
 
         public EditorViewState CaptureViewState()
