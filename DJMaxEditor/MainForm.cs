@@ -285,12 +285,14 @@ namespace DJMaxEditor
             _saveHandler.Register(new TQSaveFile());
             _saveHandler.Register(new BMESaveFile());
             _saveHandler.Register(new BmsonSaveFile());
+            _saveHandler.Register(new DJMaxEditor.Files.Tech.TechSaveFile());
 
             _loadHandler = new LoadHandler();
             _loadHandler.Register(new PTOpenFile());
             _loadHandler.Register(new TQOpenFile());
             _loadHandler.Register(new CyclonXmlOpenFile());
             _loadHandler.Register(new BmsOpenFile());
+            _loadHandler.Register(new DJMaxEditor.Files.Tech.TechOpenFile());
 
             var editor = m_editorForm.Editor;
 
@@ -451,6 +453,7 @@ namespace DJMaxEditor
             StudioTheme.ApplyToForm(m_notes);
             StudioTheme.ApplyToForm(m_preview);
             SetFollowPlayback(m_editorForm.Editor.FollowTracksProgressWhilePlaying);
+            SetSplitView(_splitViewEnabled);
             UpdateStudioRails();
         }
 
@@ -484,6 +487,36 @@ namespace DJMaxEditor
             };
             resetButton.Click += delegate { m_editorForm.ResetActiveZoom(); };
             toolStrip1.Items.Add(resetButton);
+
+            m_splitViewButton = new ToolStripButton("S  SPLIT")
+            {
+                AutoSize = false,
+                CheckOnClick = true,
+                DisplayStyle = ToolStripItemDisplayStyle.Text,
+                Font = StudioTheme.StrongFont(7.75f),
+                ForeColor = StudioTheme.MutedText,
+                Height = 28,
+                Margin = new Padding(2, 1, 2, 1),
+                Width = 68,
+                ToolTipText = "Split the chart into upper and lower panes (S, applies to all charts)"
+            };
+            m_splitViewButton.Click += delegate { SetSplitView(m_splitViewButton.Checked); };
+            toolStrip1.Items.Add(m_splitViewButton);
+
+            m_docSplitButton = new ToolStripButton("DOC SPLIT")
+            {
+                AutoSize = false,
+                CheckOnClick = true,
+                DisplayStyle = ToolStripItemDisplayStyle.Text,
+                Font = StudioTheme.StrongFont(7.75f),
+                ForeColor = StudioTheme.MutedText,
+                Height = 28,
+                Margin = new Padding(2, 1, 2, 1),
+                Width = 76,
+                ToolTipText = "Show open charts in top and bottom panes (needs 2 or more charts)"
+            };
+            m_docSplitButton.Click += delegate { SetDocumentSplit(m_docSplitButton.Checked); };
+            toolStrip1.Items.Add(m_docSplitButton);
 
             SetActiveTool(TimelineTool.Select);
         }
@@ -549,6 +582,15 @@ namespace DJMaxEditor
                 StudioCommandContext.Timeline, () => _documentContext != null,
                 () => "Open a chart before resetting the zoom.",
                 () => m_editorForm.ResetActiveZoom()));
+            m_commands.Register(new StudioCommand(
+                "view.split-panes", "Toggle split editor panes", "View", Keys.S,
+                StudioCommandContext.Global, () => true, () => string.Empty,
+                () => SetSplitView(!_splitViewEnabled)));
+            m_commands.Register(new StudioCommand(
+                "view.split-documents", "Split open charts top and bottom", "View", Keys.None,
+                StudioCommandContext.Document, () => _documents.Count >= 2,
+                () => "Open at least two charts to split the document area.",
+                () => SetDocumentSplit(!_documentSplitEnabled)));
             RegisterWorkspaceCommand(
                 "workspace.editing", "Use Editing workspace", StudioWorkspacePreset.Editing);
             RegisterWorkspaceCommand(
@@ -803,6 +845,8 @@ namespace DJMaxEditor
                     return "CYCLON XML";
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.BmsClassic:
                     return "BMS FAMILY";
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.TechmaniaTrack:
+                    return "TECHMANIA";
                 default:
                     return capabilities.SourceFormat.Value.ToString().ToUpperInvariant();
             }
@@ -853,6 +897,10 @@ namespace DJMaxEditor
         private SaveHandler _saveHandler;
         private LoadHandler _loadHandler;
         private ToolStripMenuItem m_timelineV2MenuItem;
+        private ToolStripButton m_splitViewButton;
+        private ToolStripButton m_docSplitButton;
+        private bool _splitViewEnabled = Properties.Settings.Default.SplitEditorPanes;
+        private bool _documentSplitEnabled;
         private readonly StudioCommandRegistry m_commands = new StudioCommandRegistry();
         private readonly Dictionary<TimelineTool, ToolStripButton> m_toolButtons =
             new Dictionary<TimelineTool, ToolStripButton>();
@@ -1115,6 +1163,8 @@ namespace DJMaxEditor
                     filename + " opened read-only (source=" + playerData.SourceFormat + ")");
             }
 
+            ApplyTechnikaThemesForChart(playerData.SourceFormat);
+
             // A chart that is already open gets its tab activated instead of a duplicate.
             ChartDocument existing = _documents.Find(doc =>
                 string.Equals(doc.Context.SourcePath, filename, StringComparison.OrdinalIgnoreCase));
@@ -1170,6 +1220,8 @@ namespace DJMaxEditor
             editor.OnSelectItem += Editor_OnSelectItem;
             editor.OnRequestEvent += Editor_OnRequestEvent;
             editor.OnUndoRedo += UndoManager_OnUndoRedo;
+            editor.SplitViewEnabled = _splitViewEnabled;
+            StudioTheme.ApplyToForm(form);
         }
 
         private EditorForm CreateDocumentForm()
@@ -1562,6 +1614,110 @@ namespace DJMaxEditor
             }
         }
 
+        private void SetSplitView(bool split)
+        {
+            _splitViewEnabled = split;
+            foreach (var form in _wiredEditorForms)
+            {
+                if (form.IsDisposed)
+                {
+                    continue;
+                }
+                form.Editor.SplitViewEnabled = split;
+            }
+            if (m_splitViewButton != null)
+            {
+                m_splitViewButton.Checked = split;
+                m_splitViewButton.ForeColor = split
+                    ? StudioDesignSystem.PulseCyan
+                    : StudioDesignSystem.Muted;
+            }
+            Properties.Settings.Default.SplitEditorPanes = split;
+            Properties.Settings.Default.Save();
+        }
+
+        private void SetDocumentSplit(bool split)
+        {
+            if (split && _documents.Count < 2)
+            {
+                if (m_docSplitButton != null)
+                {
+                    m_docSplitButton.Checked = false;
+                }
+                SetStudioStatus("OPEN TWO CHARTS TO USE DOC SPLIT");
+                return;
+            }
+
+            _documentSplitEnabled = split;
+            if (m_docSplitButton != null)
+            {
+                m_docSplitButton.Checked = split;
+                m_docSplitButton.ForeColor = split
+                    ? StudioDesignSystem.PulseCyan
+                    : StudioDesignSystem.Muted;
+            }
+
+            if (split)
+            {
+                ApplyDocumentSplit();
+            }
+            else
+            {
+                MergeDocumentPanes();
+            }
+        }
+
+        private void ApplyDocumentSplit()
+        {
+            if (_activeDocument == null || _activeDocument.Form.IsDisposed)
+            {
+                return;
+            }
+
+            ChartDocument anchor = _documents.Find(
+                doc => !object.ReferenceEquals(doc, _activeDocument));
+            DockPane anchorPane = anchor == null ? null : anchor.Form.DockHandler.Pane;
+            EditorForm activeForm = _activeDocument.Form;
+            if (anchorPane == null)
+            {
+                return;
+            }
+
+            if (object.ReferenceEquals(activeForm.DockHandler.Pane, anchorPane))
+            {
+                activeForm.Show(anchorPane, DockAlignment.Bottom, 0.5);
+            }
+            activeForm.Activate();
+        }
+
+        private void MergeDocumentPanes()
+        {
+            if (_documents.Count == 0)
+            {
+                return;
+            }
+
+            DockPane primary = _documents[0].Form.DockHandler.Pane;
+            if (primary == null)
+            {
+                return;
+            }
+
+            foreach (ChartDocument doc in _documents)
+            {
+                DockPane pane = doc.Form.DockHandler.Pane;
+                if (pane != null && !object.ReferenceEquals(pane, primary))
+                {
+                    doc.Form.Show(primary, (IDockContent)null);
+                }
+            }
+
+            if (_activeDocument != null && !_activeDocument.Form.IsDisposed)
+            {
+                _activeDocument.Form.Activate();
+            }
+        }
+
         private int GetActiveZoomPercent()
         {
             if (m_editorForm == null)
@@ -1596,6 +1752,8 @@ namespace DJMaxEditor
                     return _loadHandler.GetHandlerForExtension(".xml");
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.BmsClassic:
                     return _loadHandler.GetHandlerForExtension(".bms");
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.TechmaniaTrack:
+                    return _loadHandler.GetHandlerForExtension(".tech");
                 default:
                     return null;
             }
@@ -1605,6 +1763,29 @@ namespace DJMaxEditor
         {
             if (InvokeRequired) BeginInvoke(action);
             else action();
+        }
+
+        // A multi-difficulty track.tech container opens one pattern at a time; the chooser
+        // picks which slot imports while every other slot is retained verbatim for save-back.
+        private bool ChooseTechPattern(DJMaxEditor.Files.Tech.TechOpenFile handler, string filename)
+        {
+            handler.SelectedPatternIndex = 0;
+            var patterns = handler.EnumeratePatterns(filename);
+            if (patterns == null || patterns.Count <= 1)
+            {
+                return true;
+            }
+
+            using (var picker = new DJMaxEditor.Files.Tech.TechPatternPickerForm(patterns))
+            {
+                picker.Icon = this.Icon;
+                if (picker.ShowDialog(this) != DialogResult.OK)
+                {
+                    return false;
+                }
+                handler.SelectedPatternIndex = picker.SelectedPatternIndex;
+                return true;
+            }
         }
 
         private bool OpenFileAsync(IOpenFile file, string filename, bool readOnly,
@@ -1691,6 +1872,12 @@ namespace DJMaxEditor
             if (handler == null)
             {
                 ShowLoadDiagnostic(Path.GetFileName(filename), detection);
+                return;
+            }
+
+            var techHandler = handler as DJMaxEditor.Files.Tech.TechOpenFile;
+            if (techHandler != null && !ChooseTechPattern(techHandler, filename))
+            {
                 return;
             }
 
@@ -2334,6 +2521,47 @@ namespace DJMaxEditor
             ThemeDropDownButton.Text = "Events theme  " + theme.GetName();
             m_notes.ApplyTheme(theme);
             ApplyPreviewProfileFromEventTheme();
+        }
+
+        // .pt (PTFF), .bytes (Technika Q trailer) and .tech (TECHMANIA) charts all speak the
+        // TECHNIKA note vocabulary: switch the events and zones themes to Technika so the
+        // lanes render properly.
+        private void ApplyTechnikaThemesForChart(DJMaxEditor.Files.FormatDetection.ChartFormat? sourceFormat)
+        {
+            if (sourceFormat != DJMaxEditor.Files.FormatDetection.ChartFormat.PtffDecrypted &&
+                sourceFormat != DJMaxEditor.Files.FormatDetection.ChartFormat.PtffEncryptedTechnika &&
+                sourceFormat != DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV &&
+                sourceFormat != DJMaxEditor.Files.FormatDetection.ChartFormat.TechmaniaTrack)
+            {
+                return;
+            }
+
+            var editor = m_editorForm.Editor;
+            var eventsTheme = editor.EventsThemeList.FirstOrDefault(theme => theme.GetName() == "Technika");
+            if (eventsTheme != null && !object.ReferenceEquals(eventsTheme, m_currentEventsTheme))
+            {
+                CheckThemeItem(ThemeDropDownButton, eventsTheme.GetName());
+                ApplyEventsTheme(eventsTheme);
+            }
+
+            var zonesTheme = editor.ZonesThemeList.FirstOrDefault(theme => theme.GetName() == "Technika");
+            if (zonesTheme != null && !object.ReferenceEquals(zonesTheme, m_currentZonesTheme))
+            {
+                CheckThemeItem(zoneRendererToolStripDropDownButton, zonesTheme.GetName());
+                ApplyZonesTheme(zonesTheme);
+            }
+        }
+
+        private static void CheckThemeItem(ToolStripDropDownButton button, string themeName)
+        {
+            foreach (ToolStripItem item in button.DropDownItems)
+            {
+                var menuItem = item as ToolStripMenuItem;
+                if (menuItem != null)
+                {
+                    menuItem.Checked = menuItem.Text == themeName;
+                }
+            }
         }
 
         private void ApplyZonesTheme(IZoneRenderer theme)

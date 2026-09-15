@@ -34,5 +34,17 @@ namespace DJMaxEditor.Properties {
                 this["UseTimelineV2"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SplitEditorPanes {
+            get {
+                return ((bool)(this["SplitEditorPanes"]));
+            }
+            set {
+                this["SplitEditorPanes"] = value;
+            }
+        }
     }
 }

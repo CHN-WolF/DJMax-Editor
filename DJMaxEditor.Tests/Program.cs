@@ -110,6 +110,7 @@ namespace DJMaxEditor.Tests
             });
 
             RunBmsFormatTests(fixtures, bmsFixtures);
+            RunTechFormatTests();
             RunSharedEditingTests();
 
             // ---- Detector: real fixtures (SKIP if not provided) ----

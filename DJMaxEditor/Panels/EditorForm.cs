@@ -71,11 +71,11 @@ namespace DJMaxEditor
             PrepareSurface(_legacySurface);
             PrepareSurface(_timelineV2Surface);
 
+            // Z-order sets dock precedence: the status strip docks first and reserves
+            // the bottom edge so the surface host's horizontal scrollbar stays visible.
+            Controls.Add(_emptyWorkspace);
             Controls.Add(_surfaceHost);
             Controls.Add(_documentStatus);
-            Controls.Add(_emptyWorkspace);
-            _emptyWorkspace.BringToFront();
-            _documentStatus.BringToFront();
 
             ActiveSurface = EditorSurfaceSelection.Resolve(useTimelineV2) ==
                 EditorSurfaceKind.TimelineV2

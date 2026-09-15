@@ -50,7 +50,8 @@ namespace DJMaxEditor.Files.FormatDetection
             Format == ChartFormat.PtffDecrypted ||
             Format == ChartFormat.TrailerRespectV ||
             Format == ChartFormat.CyclonXml ||
-            Format == ChartFormat.BmsClassic;
+            Format == ChartFormat.BmsClassic ||
+            Format == ChartFormat.TechmaniaTrack;
 
         public override string ToString()
         {
