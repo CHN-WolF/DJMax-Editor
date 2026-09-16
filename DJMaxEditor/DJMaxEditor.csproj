@@ -457,6 +457,8 @@
     <Compile Include="DJMax\Player.cs" />
     <Compile Include="libs\CustomTimer.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="SingleInstance.cs" />
+    <Compile Include="FileAssociations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Files\pt\PTOpenFile.cs" />
     <Compile Include="Panels\ToolWindow.cs">

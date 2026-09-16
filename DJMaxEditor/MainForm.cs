@@ -267,8 +267,14 @@ namespace DJMaxEditor
             }
         }
 
-        public MainForm()
+        public MainForm() : this(null)
         {
+        }
+
+        public MainForm(string[] startupFiles)
+        {
+            _startupFiles = startupFiles;
+
             InitializeComponent();
 
             m_timelineV2MenuItem = new ToolStripMenuItem(
@@ -921,6 +927,8 @@ namespace DJMaxEditor
         private readonly HashSet<EditorForm> _wiredEditorForms = new HashSet<EditorForm>();
         private ChartDocument _activeDocument;
         private bool _closingAll;
+        private readonly string[] _startupFiles;
+        private IDisposable _singleInstanceServer;
 
         private EditorForm m_editorForm
         {
@@ -2035,24 +2043,129 @@ namespace DJMaxEditor
 
         private void TryOpenFromCommandLine()
         {
-            var args = Environment.GetCommandLineArgs();
-            if (!(args.Length > 1))
+            if (_startupFiles == null)
             {
                 return;
             }
 
-            var fileToLoad = args[1];
-            if (String.IsNullOrEmpty(fileToLoad))
+            foreach (var fileToLoad in _startupFiles)
             {
-                return;
+                if (String.IsNullOrEmpty(fileToLoad) || !File.Exists(fileToLoad))
+                {
+                    continue;
+                }
+                OpenFile(fileToLoad);
+            }
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            // Host the single-instance pipe: files passed to later processes are forwarded
+            // here and opened as tabs in this one.
+            try
+            {
+                _singleInstanceServer = SingleInstance.StartServer(paths =>
+                {
+                    try
+                    {
+                        if (IsDisposed || !IsHandleCreated)
+                        {
+                            return;
+                        }
+                        BeginInvoke(new Action(() => OnExternalOpen(paths)));
+                    }
+                    catch (Exception ex)
+                    {
+                        DJMaxEditor.Diagnostics.DiagnosticLog.Exception("singleinstance.invoke", ex);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                DJMaxEditor.Diagnostics.DiagnosticLog.Exception("singleinstance.server.start", ex);
+            }
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            if (_singleInstanceServer != null)
+            {
+                _singleInstanceServer.Dispose();
+            }
+            base.OnFormClosed(e);
+        }
+
+        private void OnExternalOpen(string[] paths)
+        {
+            if (paths != null)
+            {
+                foreach (var path in paths)
+                {
+                    if (String.IsNullOrEmpty(path) || !File.Exists(path))
+                    {
+                        continue;
+                    }
+                    OpenFile(path);
+                }
+            }
+            ForceForeground();
+        }
+
+        private void ForceForeground()
+        {
+            if (WindowState == FormWindowState.Minimized)
+            {
+                WindowState = FormWindowState.Normal;
+            }
+            if (!Visible)
+            {
+                Show();
             }
 
-            if (!File.Exists(fileToLoad))
+            // SetForegroundWindow is restricted for background processes; attaching to the
+            // foreground thread's input queue is the usual way to make it stick.
+            IntPtr foreground = NativeMethods.GetForegroundWindow();
+            uint foregroundProcessId;
+            uint foregroundThread = NativeMethods.GetWindowThreadProcessId(foreground, out foregroundProcessId);
+            uint currentThread = NativeMethods.GetCurrentThreadId();
+            if (foregroundThread != 0 && foregroundThread != currentThread)
             {
-                return;
+                NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
+                NativeMethods.SetForegroundWindow(Handle);
+                NativeMethods.BringWindowToTop(Handle);
+                NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
             }
+            else
+            {
+                NativeMethods.SetForegroundWindow(Handle);
+            }
+            Activate();
+        }
 
-            OpenFile(fileToLoad);
+        private static class NativeMethods
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+            public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            public static extern IntPtr GetForegroundWindow();
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+            public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+            [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+            public static extern uint GetCurrentThreadId();
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+            public static extern bool BringWindowToTop(IntPtr hWnd);
         }
 
         private void Form1_Shown(object sender, EventArgs e)
