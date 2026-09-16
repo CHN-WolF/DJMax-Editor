@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,13 +15,11 @@ namespace DJMaxEditor
         {
             try
             {
-#if DEBUG
                 string str = String.Format(content, args);
                 if (OnLogWrite != null)
                 {
                     OnLogWrite(str);
                 }
-#endif
             }
             catch (Exception e)
             {
