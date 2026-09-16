@@ -111,6 +111,7 @@ namespace DJMaxEditor.Tests
 
             RunBmsFormatTests(fixtures, bmsFixtures);
             RunTechFormatTests();
+            RunTrailerSaveRoundTripTests();
             RunSharedEditingTests();
 
             // ---- Detector: real fixtures (SKIP if not provided) ----
