@@ -488,7 +488,7 @@ namespace DJMaxEditor
             resetButton.Click += delegate { m_editorForm.ResetActiveZoom(); };
             toolStrip1.Items.Add(resetButton);
 
-            m_splitViewButton = new ToolStripButton("S  SPLIT")
+            m_splitViewButton = new ToolStripButton("SPLIT CHART VIEW")
             {
                 AutoSize = false,
                 CheckOnClick = true,
@@ -497,7 +497,7 @@ namespace DJMaxEditor
                 ForeColor = StudioTheme.MutedText,
                 Height = 28,
                 Margin = new Padding(2, 1, 2, 1),
-                Width = 68,
+                Width = 122,
                 ToolTipText = "Split the chart into upper and lower panes"
             };
             m_splitViewButton.Click += delegate { SetSplitView(m_splitViewButton.Checked); };
