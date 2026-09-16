@@ -1,16 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.ComponentModel;
 using DJMaxEditor.DJMax;
+using DJMaxEditor.Editor;
 
 namespace DJMaxEditor.PropertyLayer
 {
     public class VolumeEventPropertiesLayer : PropertiesLayerBase
     {
-        public VolumeEventPropertiesLayer (EventData eventData)
-            : base(eventData)
+        public VolumeEventPropertiesLayer (EventData eventData, ChartEditController edits = null)
+            : base(eventData, edits)
         {
             EventData = eventData;
         }
@@ -21,7 +22,14 @@ namespace DJMaxEditor.PropertyLayer
                 return _eventData.Volume;
             }
             set {
-                _eventData.Volume = value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionVolume(value);
+                }
+                else
+                {
+                    _eventData.Volume = value;
+                }
             }
         }
 

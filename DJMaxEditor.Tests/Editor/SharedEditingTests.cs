@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using DJMaxEditor.DJMax;
 using DJMaxEditor.Editor;
+using DJMaxEditor.PropertyLayer;
 
 namespace DJMaxEditor.Tests
 {
@@ -621,6 +622,99 @@ namespace DJMaxEditor.Tests
                     "a null instrument should be rejected");
                 AssertTrue(!undo.CanUndo,
                     "no-op batch mutations created an undo entry");
+            });
+
+            Test("ChartEdit_SingleNoteLayerPropertyEditsAreUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var note = AddEditingEvent(model, 0, 12);
+                note.Vel = 90;
+                note.Pan = 70;
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { note });
+
+                var layer = new NoteEventPropertiesLayer(note, context.Edits);
+                layer.Vel = 120;
+                layer.Pan = 30;
+                layer.Duration = 8;
+
+                AssertTrue(note.Vel == 120 && note.Pan == 30 && note.Duration == 8,
+                    "single-note layer setters should apply through the edit controller");
+                AssertTrue(undo.CanUndo, "single-note property edit must create an undo entry");
+
+                undo.Undo();
+                undo.Undo();
+                undo.Undo();
+                AssertTrue(note.Vel == 90 && note.Pan == 70 && note.Duration == 1,
+                    "undo should restore every property changed through the single-note layer");
+                AssertTrue(!undo.CanUndo, "every single-note edit should be undone");
+            });
+
+            Test("ChartEdit_SingleNoteLayerPositionMoveIsUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var note = AddEditingEvent(model, 0, 12);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { note });
+
+                var layer = new NoteEventPropertiesLayer(note, context.Edits);
+                layer.Position = 10;
+
+                AssertTrue(note.VirtualTick == 60, "position edit should move the note");
+                AssertTrue(undo.CanUndo, "position edit must create an undo entry");
+
+                undo.Undo();
+                AssertTrue(note.VirtualTick == 12, "undo should restore the original position");
+            });
+
+            Test("ChartEdit_SingleTempoLayerEditIsUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var tempo = new EventData
+                {
+                    EventType = EventType.Tempo,
+                    VirtualTick = 12,
+                    Tempo = 140f
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(tempo);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { tempo });
+
+                var layer = new TempoEventPropertiesLayer(tempo, context.Edits);
+                layer.Tempo = 175.5f;
+
+                AssertTrue(tempo.Tempo == 175.5f, "tempo layer setter should apply");
+                AssertTrue(undo.CanUndo, "tempo edit must create an undo entry");
+
+                undo.Undo();
+                AssertTrue(tempo.Tempo == 140f, "undo should restore the original tempo");
+            });
+
+            Test("ChartEdit_SingleVolumeLayerEditIsUndoable", () =>
+            {
+                var model = EditingModel(1);
+                var volume = new EventData
+                {
+                    EventType = EventType.Volume,
+                    VirtualTick = 12,
+                    Volume = 80
+                };
+                model.Tracks.GetTrackAtIndex(0).AddEvent(volume);
+                var undo = new UndoManager();
+                var context = new EditorDocumentContext(model, "editing.pt", undo);
+                context.Selection.Replace(new[] { volume });
+
+                var layer = new VolumeEventPropertiesLayer(volume, context.Edits);
+                layer.Volume = 127;
+
+                AssertTrue(volume.Volume == 127, "volume layer setter should apply");
+                AssertTrue(undo.CanUndo, "volume edit must create an undo entry");
+
+                undo.Undo();
+                AssertTrue(volume.Volume == 80, "undo should restore the original volume");
             });
         }
 

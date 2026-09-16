@@ -94,22 +94,22 @@ namespace DJMaxEditor
             {
                 case EventType.Note:
                     {
-                        m_propertiesForm.PropertyObject = new NoteEventPropertiesLayer(eventData);
+                        m_propertiesForm.PropertyObject = new NoteEventPropertiesLayer(eventData, _documentContext?.Edits);
                     }
                     break;
                 case EventType.Volume:
                     {
-                        m_propertiesForm.PropertyObject = new VolumeEventPropertiesLayer(eventData);
+                        m_propertiesForm.PropertyObject = new VolumeEventPropertiesLayer(eventData, _documentContext?.Edits);
                     }
                     break;
                 case EventType.Tempo:
                     {
-                        m_propertiesForm.PropertyObject = new TempoEventPropertiesLayer(eventData);
+                        m_propertiesForm.PropertyObject = new TempoEventPropertiesLayer(eventData, _documentContext?.Edits);
                     }
                     break;
                 case EventType.Beat:
                     {
-                        m_propertiesForm.PropertyObject = new BeatEventPropertiesLayer(eventData);
+                        m_propertiesForm.PropertyObject = new BeatEventPropertiesLayer(eventData, _documentContext?.Edits);
                     }
                     break;
                 default:
