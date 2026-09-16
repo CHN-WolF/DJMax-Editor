@@ -498,12 +498,12 @@ namespace DJMaxEditor
                 Height = 28,
                 Margin = new Padding(2, 1, 2, 1),
                 Width = 68,
-                ToolTipText = "Split the chart into upper and lower panes (S, applies to all charts)"
+                ToolTipText = "Split the chart into upper and lower panes"
             };
             m_splitViewButton.Click += delegate { SetSplitView(m_splitViewButton.Checked); };
             toolStrip1.Items.Add(m_splitViewButton);
 
-            m_docSplitButton = new ToolStripButton("DOC SPLIT")
+            m_docSplitButton = new ToolStripButton("DUAL CHART VIEW")
             {
                 AutoSize = false,
                 CheckOnClick = true,
@@ -512,7 +512,7 @@ namespace DJMaxEditor
                 ForeColor = StudioTheme.MutedText,
                 Height = 28,
                 Margin = new Padding(2, 1, 2, 1),
-                Width = 76,
+                Width = 124,
                 ToolTipText = "Show open charts in top and bottom panes (needs 2 or more charts)"
             };
             m_docSplitButton.Click += delegate { SetDocumentSplit(m_docSplitButton.Checked); };
@@ -1644,7 +1644,7 @@ namespace DJMaxEditor
                 {
                     m_docSplitButton.Checked = false;
                 }
-                SetStudioStatus("OPEN TWO CHARTS TO USE DOC SPLIT");
+                SetStudioStatus("OPEN TWO CHARTS TO USE DUAL CHART VIEW");
                 return;
             }
 

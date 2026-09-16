@@ -46,10 +46,11 @@ namespace DJMaxEditor.UI
                 StudioTheme.CreatePlayIcon(StudioDesignSystem.PulseCyan),
                 "Follow Playback");
             _zoomButton = StudioDesignSystem.CreateDeckButton("100%");
-            _zoomButton.Height = 27;
-            _zoomButton.Width = 58;
+            _zoomButton.AutoSize = true;
+            _zoomButton.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            _zoomButton.MinimumSize = new Size(0, 27);
             _zoomButton.Margin = new Padding(3, 3, 3, 3);
-            _zoomButton.Font = StudioDesignSystem.UtilityFont(7.5f);
+            _zoomButton.Font = StudioDesignSystem.BodyFont(8.5f, FontStyle.Bold);
             _zoomButton.ForeColor = StudioDesignSystem.Muted;
             _zoomButton.Click += delegate { if (ZoomResetRequested != null) ZoomResetRequested(this, EventArgs.Empty); };
             _toolTip.SetToolTip(_zoomButton, "Reset zoom to 100%");
@@ -79,7 +80,6 @@ namespace DJMaxEditor.UI
             toolbar.Controls.Add(_undoButton);
             toolbar.Controls.Add(_redoButton);
             toolbar.Controls.Add(_followButton);
-            toolbar.Controls.Add(_zoomButton);
 
             _documentLabel = CreateLabel("NO DOCUMENT", 230, StudioDesignSystem.Frost);
             _documentLabel.AutoEllipsis = true;
@@ -88,11 +88,11 @@ namespace DJMaxEditor.UI
             _formatChip = CreateChip("NO SOURCE", StudioDesignSystem.Muted);
             _capabilityChip = CreateChip("OPEN A CHART", StudioDesignSystem.SignalAmber);
 
-            _timelineV1 = CreateRailButton("V1");
-            _timelineV2 = CreateRailButton("V2");
-            _preview = CreateRailButton("PREVIEW", 76);
-            _workspace = CreateRailButton("WORKSPACE  ▾", 104);
-            _palette = CreateRailButton("COMMANDS  Ctrl+K", 132);
+            _timelineV1 = CreateRailButton("TIMELINE V1");
+            _timelineV2 = CreateRailButton("TIMELINE V2");
+            _preview = CreateRailButton("PREVIEW");
+            _workspace = CreateRailButton("WORKSPACE  ▾");
+            _palette = CreateRailButton("COMMANDS  Ctrl+K");
             _workspaceMenu = BuildWorkspaceMenu();
 
             _timelineV1.Click += delegate { if (TimelineV1Requested != null) TimelineV1Requested(this, EventArgs.Empty); };
@@ -106,16 +106,17 @@ namespace DJMaxEditor.UI
 
             var right = new FlowLayoutPanel
             {
-                AutoSize = false,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 BackColor = StudioDesignSystem.Deck,
                 Dock = DockStyle.Right,
                 FlowDirection = FlowDirection.LeftToRight,
                 Height = 34,
                 Margin = Padding.Empty,
                 Padding = Padding.Empty,
-                Width = 690,
                 WrapContents = false
             };
+            right.Controls.Add(_zoomButton);
             right.Controls.Add(_formatChip);
             right.Controls.Add(_capabilityChip);
             right.Controls.Add(_timelineV1);
@@ -285,26 +286,26 @@ namespace DJMaxEditor.UI
         {
             return new Label
             {
-                AutoEllipsis = true,
+                AutoSize = true,
                 BackColor = StudioDesignSystem.Lift,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = StudioDesignSystem.UtilityFont(7.5f),
+                Font = StudioDesignSystem.BodyFont(8.5f, FontStyle.Bold),
                 ForeColor = foreground,
-                Height = 27,
                 Margin = new Padding(3, 3, 3, 3),
+                MinimumSize = new Size(0, 27),
                 Padding = new Padding(8, 5, 8, 0),
                 Text = text,
-                TextAlign = ContentAlignment.TopCenter,
-                Width = 112
+                TextAlign = ContentAlignment.TopCenter
             };
         }
 
-        private static Button CreateRailButton(string text, int width = 38)
+        private static Button CreateRailButton(string text)
         {
             Button button = StudioDesignSystem.CreateDeckButton(text);
-            button.Height = 28;
+            button.AutoSize = true;
+            button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            button.MinimumSize = new Size(0, 28);
             button.Margin = new Padding(2, 3, 2, 3);
-            button.Width = width;
             return button;
         }
 
