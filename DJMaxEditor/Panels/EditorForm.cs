@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -71,11 +71,11 @@ namespace DJMaxEditor
             PrepareSurface(_legacySurface);
             PrepareSurface(_timelineV2Surface);
 
+            // Z-order sets dock precedence: the status strip docks first and reserves
+            // the bottom edge so the surface host's horizontal scrollbar stays visible.
+            Controls.Add(_emptyWorkspace);
             Controls.Add(_surfaceHost);
             Controls.Add(_documentStatus);
-            Controls.Add(_emptyWorkspace);
-            _emptyWorkspace.BringToFront();
-            _documentStatus.BringToFront();
 
             ActiveSurface = EditorSurfaceSelection.Resolve(useTimelineV2) ==
                 EditorSurfaceKind.TimelineV2
@@ -97,6 +97,33 @@ namespace DJMaxEditor
         public bool IsLegacySurfaceActive
         {
             get { return object.ReferenceEquals(ActiveSurface, _legacySurface); }
+        }
+
+        /// <summary>
+        /// Zoom of the active surface relative to its own default (1.0 = default zoom).
+        /// </summary>
+        public float ActiveZoomFactor
+        {
+            get
+            {
+                if (IsLegacySurfaceActive)
+                {
+                    return editorControl1.GetZoom() / EditorControl.DefaultZoom;
+                }
+                return (float)(_timelineV2Surface.TimeZoom / TimelineViewport.DefaultPixelsPerTick);
+            }
+        }
+
+        public void ResetActiveZoom()
+        {
+            if (IsLegacySurfaceActive)
+            {
+                editorControl1.SetZoom(EditorControl.DefaultZoom);
+            }
+            else
+            {
+                _timelineV2Surface.TrySetTimeZoom((float)TimelineViewport.DefaultPixelsPerTick);
+            }
         }
 
         public string DocumentStatusText

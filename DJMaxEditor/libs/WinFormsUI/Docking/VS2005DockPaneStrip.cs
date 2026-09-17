@@ -115,6 +115,8 @@ namespace WeifenLuo.WinFormsUI.Docking
         private const int _DocumentIconHeight = 16;
         private const int _DocumentIconWidth = 16;
         private const int _DocumentTextGapRight = 3;
+        private const int _DocumentCloseButtonSize = 14;
+        private const int _DocumentCloseButtonGapRight = 4;
 
         #endregion
 
@@ -538,6 +540,25 @@ namespace WeifenLuo.WinFormsUI.Docking
             get { return _DocumentTextGapRight; }
         }
 
+        private static int DocumentCloseButtonSize
+        {
+            get { return _DocumentCloseButtonSize; }
+        }
+
+        private static int DocumentCloseButtonGapRight
+        {
+            get { return _DocumentCloseButtonGapRight; }
+        }
+
+        private Rectangle GetDocumentCloseButtonRectangle(Rectangle rectTab)
+        {
+            return DrawHelper.RtlTransform(this, new Rectangle(
+                rectTab.Right - DocumentCloseButtonGapRight - DocumentCloseButtonSize,
+                rectTab.Y + (rectTab.Height - DocumentCloseButtonSize) / 2,
+                DocumentCloseButtonSize,
+                DocumentCloseButtonSize));
+        }
+
         private static Pen PenToolWindowTabBorder
         {
             get { return SystemPens.GrayText; }
@@ -949,10 +970,15 @@ namespace WeifenLuo.WinFormsUI.Docking
 
             Size sizeText = TextRenderer.MeasureText(content.DockHandler.TabText, BoldFont, new Size(DocumentTabMaxWidth, height), DocumentTextFormat);
 
+            int width;
             if (DockPane.DockPanel.ShowDocumentIcon)
-                return sizeText.Width + DocumentIconWidth + DocumentIconGapLeft + DocumentIconGapRight + DocumentTextGapRight;
+                width = sizeText.Width + DocumentIconWidth + DocumentIconGapLeft + DocumentIconGapRight + DocumentTextGapRight;
             else
-                return sizeText.Width + DocumentIconGapLeft + DocumentTextGapRight;
+                width = sizeText.Width + DocumentIconGapLeft + DocumentTextGapRight;
+
+            if (content.DockHandler.CloseButton)
+                width += DocumentCloseButtonSize + DocumentCloseButtonGapRight;
+            return width;
         }
 
         private void DrawTabStrip(Graphics g)
@@ -1314,6 +1340,9 @@ namespace WeifenLuo.WinFormsUI.Docking
             else
                 rectText.Width = rect.Width - DocumentIconGapLeft - DocumentTextGapRight;
 
+            if (tab.Content.DockHandler.CloseButton)
+                rectText.Width -= (DocumentCloseButtonSize + DocumentCloseButtonGapRight);
+
             Rectangle rectTab = DrawHelper.RtlTransform(this, rect);
             Rectangle rectBack = DrawHelper.RtlTransform(this, rect);
             rectBack.Width += rect.X;
@@ -1350,6 +1379,23 @@ namespace WeifenLuo.WinFormsUI.Docking
 
             if (rectTab.Contains(rectIcon) && DockPane.DockPanel.ShowDocumentIcon)
                 g.DrawIcon(tab.Content.DockHandler.Icon, rectIcon);
+
+            if (tab.Content.DockHandler.CloseButton)
+            {
+                Color closeColor = DockPane.ActiveContent == tab.Content
+                    ? DockPane.DockPanel.Skin.DockPaneStripSkin.DocumentGradient.ActiveTabGradient.TextColor
+                    : DockPane.DockPanel.Skin.DockPaneStripSkin.DocumentGradient.InactiveTabGradient.TextColor;
+                Rectangle rectClose = GetDocumentCloseButtonRectangle(rect);
+                using (Pen pen = new Pen(closeColor, 1.6f))
+                {
+                    g.DrawLine(pen,
+                        rectClose.X + 4, rectClose.Y + 4,
+                        rectClose.Right - 4, rectClose.Bottom - 4);
+                    g.DrawLine(pen,
+                        rectClose.Right - 4, rectClose.Y + 4,
+                        rectClose.X + 4, rectClose.Bottom - 4);
+                }
+            }
         }
 
         private void WindowList_Click(object sender, EventArgs e)
@@ -1455,6 +1501,31 @@ namespace WeifenLuo.WinFormsUI.Docking
                     return Tabs.IndexOf(tab);
             }
             return -1;
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left &&
+                Appearance == DockPane.AppearanceStyle.Document &&
+                TabsRectangle.Contains(e.Location))
+            {
+                for (int i = 0; i < Tabs.Count; i++)
+                {
+                    TabVS2005 tab = Tabs[i] as TabVS2005;
+                    if (tab == null || !tab.Content.DockHandler.CloseButton)
+                    {
+                        continue;
+                    }
+
+                    if (GetDocumentCloseButtonRectangle(GetTabRectangle_Document(i)).Contains(e.Location))
+                    {
+                        DockPane.CloseContent(tab.Content);
+                        return;
+                    }
+                }
+            }
+
+            base.OnMouseDown(e);
         }
 
         protected override void OnMouseHover(EventArgs e)

@@ -48,7 +48,7 @@ namespace DJMaxEditor.Tests
                 AssertTrue(capabilities.CanEdit, "Respect V should be editable in memory");
                 AssertTrue(capabilities.CanSave, "Respect V should allow safe export");
                 AssertTrue(capabilities.CanConvert, "Respect V should be convertible");
-                AssertTrue(capabilities.StatusLabel.Contains("RESPECT V"), "Respect V status is not persistent");
+                AssertTrue(capabilities.StatusLabel.Contains("TECHNIKA Q"), "Technika Q status is not persistent");
                 AssertTrue(capabilities.StatusLabel.Contains("EDITABLE"), "Respect V editable state is not visible");
                 AssertTrue(capabilities.EditBlockReason.Length == 0, "editable Respect chart has a block reason");
             });

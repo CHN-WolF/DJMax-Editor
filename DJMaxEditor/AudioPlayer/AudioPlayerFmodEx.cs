@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace DJMaxEditor
@@ -34,6 +35,65 @@ namespace DJMaxEditor
             return debugInfo;
         }
 
+        // Sounds live in per-document tables so switching charts never reloads samples.
+        private sealed class SoundTable
+        {
+            public readonly FMODEX.Sound[] Sounds = new FMODEX.Sound[MAX_SOUND];
+            public bool FullyLoaded;
+        }
+
+        private readonly Dictionary<string, SoundTable> _soundTables =
+            new Dictionary<string, SoundTable>(StringComparer.OrdinalIgnoreCase);
+
+        private string _soundContextKey = string.Empty;
+
+        private SoundTable CurrentTable
+        {
+            get
+            {
+                SoundTable table;
+                if (!_soundTables.TryGetValue(_soundContextKey, out table))
+                {
+                    table = new SoundTable();
+                    _soundTables[_soundContextKey] = table;
+                }
+                return table;
+            }
+        }
+
+        public void SetSoundContext(string key)
+        {
+            _soundContextKey = key ?? string.Empty;
+        }
+
+        public bool IsSoundContextLoaded(string key)
+        {
+            SoundTable table;
+            return _soundTables.TryGetValue(key ?? string.Empty, out table) && table.FullyLoaded;
+        }
+
+        public void MarkSoundContextLoaded(string key)
+        {
+            CurrentTable.FullyLoaded = true;
+        }
+
+        public void ReleaseSoundContext(string key)
+        {
+            SoundTable table;
+            if (!_soundTables.TryGetValue(key ?? string.Empty, out table))
+            {
+                return;
+            }
+            foreach (FMODEX.Sound sound in table.Sounds)
+            {
+                if (sound != null)
+                {
+                    sound.release();
+                }
+            }
+            _soundTables.Remove(key ?? string.Empty);
+        }
+
         public bool LoadSound(uint index, string name, int mode = 0)
         {
             if (index >= MAX_SOUND)
@@ -41,10 +101,11 @@ namespace DJMaxEditor
                 return false;
             }
 
-            if (m_sounds[index] != null)
+            FMODEX.Sound[] sounds = CurrentTable.Sounds;
+            if (sounds[index] != null)
             {
-                m_sounds[index].release();
-                m_sounds[index] = null;
+                sounds[index].release();
+                sounds[index] = null;
             }
 
             FMODEX.MODE fmodMode = mode == 0 ? FMODEX.MODE.CREATESAMPLE : FMODEX.MODE.CREATESTREAM;
@@ -58,7 +119,7 @@ namespace DJMaxEditor
                     FMODEX.MODE.LOOP_OFF |
                     FMODEX.MODE.ACCURATETIME
                     /*| (FMODEX.MODE._2D | FMODEX.MODE.HARDWARE | FMODEX.MODE.CREATESTREAM)*/,
-                    ref m_sounds[index]
+                    ref sounds[index]
                 );
             return result == FMODEX.RESULT.OK;
         }
@@ -145,7 +206,7 @@ namespace DJMaxEditor
                 }
             }
 
-            if (m_sounds[soundIndex] == null)
+            if (CurrentTable.Sounds[soundIndex] == null)
             {
                 return false;
             }
@@ -162,7 +223,7 @@ namespace DJMaxEditor
             }
 
             FMODEX.Channel chan = null;
-            FMODEX.RESULT result = m_system.playSound(FMODEX.CHANNELINDEX.FREE, m_sounds[soundIndex], true, ref _channels[channelIndex]);
+            FMODEX.RESULT result = m_system.playSound(FMODEX.CHANNELINDEX.FREE, CurrentTable.Sounds[soundIndex], true, ref _channels[channelIndex]);
             if (result == FMODEX.RESULT.OK)
             {
                 chan = _channels[channelIndex];
@@ -238,8 +299,6 @@ namespace DJMaxEditor
         private FMODEX.ChannelGroup m_playbackGroup = null;
 
         private FMODEX.Channel[] _channels = new FMODEX.Channel[MAX_CHANNEL];
-
-        private FMODEX.Sound[] m_sounds = new FMODEX.Sound[MAX_SOUND];
 
         public const int MAX_CHANNEL = 100;
 

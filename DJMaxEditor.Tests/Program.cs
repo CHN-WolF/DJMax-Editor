@@ -110,6 +110,8 @@ namespace DJMaxEditor.Tests
             });
 
             RunBmsFormatTests(fixtures, bmsFixtures);
+            RunTechFormatTests();
+            RunTrailerSaveRoundTripTests();
             RunSharedEditingTests();
 
             // ---- Detector: real fixtures (SKIP if not provided) ----
@@ -337,6 +339,7 @@ namespace DJMaxEditor.Tests
             RunGameplayPreviewTests();
             RunStudioThemeTests();
             RunStudioShellFoundationTests();
+            RunSoundNoteSearchTests();
             if (!string.IsNullOrEmpty(timelineSnapshots))
             {
                 ExportTimelineSnapshots(fixtures, timelineSnapshots);

@@ -19,5 +19,11 @@ namespace DJMaxEditor.Editor
         void RestoreViewState(EditorViewState state);
 
         int PlayheadVirtualTick { get; set; }
+
+        /// <summary>
+        /// Scrolls the surface so the given virtual tick (and, when the surface
+        /// has per-track lanes, the given track lane) becomes visible.
+        /// </summary>
+        void RevealPosition(int virtualTick, int trackIndex);
     }
 }

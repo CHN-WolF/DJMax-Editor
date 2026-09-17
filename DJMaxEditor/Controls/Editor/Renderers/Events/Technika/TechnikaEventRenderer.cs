@@ -1,4 +1,4 @@
-﻿using DJMaxEditor.DJMax;
+using DJMaxEditor.DJMax;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -170,8 +170,6 @@ namespace DJMaxEditor.Controls.Editor.Renderers.Events
 
         public override void RenderNote(GraphicsWrapper g, EventData eventData, Rectangle eventRectangle, int centerX, int centerY)
         {
-            Bitmap img;
-
             int x = centerX;
             int y = centerY;
 
@@ -181,72 +179,42 @@ namespace DJMaxEditor.Controls.Editor.Renderers.Events
                 // if the note have a more than 6 as duration, it could be a hold note
                 if (eventData.Duration > 6)
                 {
-                    img = DJMRessources.longnoteline;
-                    g.DrawImage(
-                        img,
-                        new Rectangle(x + eventData.VirtualDuration, y - 76 / 2, 25, 76),
-                        0,
-                        0,
-                        28,
-                        76,
-                        GraphicsUnit.Pixel,
-                        null
-                    );
-
-                    g.DrawImage(img,
-                        new Rectangle(x, y - 76 / 2, eventData.VirtualDuration, 76),
-                        0,
-                        0,
-                        2,
-                        76,
-                        GraphicsUnit.Pixel,
-                        null
-                    );
-
-                    DrawImage(g, DJMRessources.longnote, x - (116 / 2), y - (116 / 2), 116, 116);
+                    DrawDragBody(g, TechnikaHdAssets.LongBody, x, y, eventData.VirtualDuration, 76);
+                    DrawImageHd(g, TechnikaHdAssets.LongHead, x - (116 / 2), y - (116 / 2), 116, 116);
                 }
                 else
                 {
-                    DrawImage(g, DJMRessources.Note_Basic, x - (90 / 2), y - (90 / 2), 90, 90);
+                    DrawImageHd(g, TechnikaHdAssets.Basic, x - (90 / 2), y - (90 / 2), 90, 90);
                 }
             }
 
             else if (eventData.Attribute == (byte)EventAttribute.PressNote)
             { // note press start
-                DrawImage(g, DJMRessources.notepressstart, x - (116 / 2), y - (116 / 2), 116, 116);
+                DrawImageHd(g, TechnikaHdAssets.LongHead, x - (116 / 2), y - (116 / 2), 116, 116);
             }
             else if (eventData.Attribute == (byte)EventAttribute.PressNoteEnd)
             { // note press start end
-                DrawImage(g, DJMRessources.notepressnote, x - (76 / 2), y - (76 / 2), 76, 76);
+                DrawImageHd(g, TechnikaHdAssets.PressEnd, x - (76 / 2), y - (76 / 2), 76, 76);
             }
             else if (eventData.Attribute == (byte)EventAttribute.RepeatNote)
             { // note repeat
 
                 if (eventData.Duration > 6)
                 {
-                    img = DJMRessources.long_note_end;
-
-                    g.DrawImage(img, new Rectangle(x + eventData.VirtualDuration, y - 90 / 2, 20, 90), 0, 0, 20, 90, GraphicsUnit.Pixel, null);
-                    g.DrawImage(img, new Rectangle(x, y - 90 / 2, eventData.VirtualDuration, 90), 0, 0, 4, 90, GraphicsUnit.Pixel, null);
+                    DrawSolidTrail(g, RepeatTrailBrush, x, y, eventData.VirtualDuration, 90);
                 }
 
-                DrawImage(g, DJMRessources.noterepeat, x - (90 / 2), y - (90 / 2), 90, 90);
+                DrawImageHd(g, TechnikaHdAssets.RepeatHead, x - (90 / 2), y - (90 / 2), 90, 90);
 
             }
             else if (eventData.Attribute == (byte)EventAttribute.RepeatNoteEnd)
             { // note repeat end
-                DrawImage(g, DJMRessources.repeattail, x - (90 / 2), y - (90 / 2), 90, 90);
+                DrawImageHd(g, TechnikaHdAssets.RepeatTail, x - (90 / 2), y - (90 / 2), 90, 90);
             }
             else if (eventData.Attribute == (byte)EventAttribute.LongHoldNote)
             { // long hold note
-
-                img = DJMRessources.line_in_end;
-
-                g.DrawImage(img, new Rectangle(x + eventData.VirtualDuration, y - 90 / 2, 20, 90), 0, 0, 20, 90, GraphicsUnit.Pixel, null);
-                g.DrawImage(img, new Rectangle(x, y - 90 / 2, eventData.VirtualDuration, 90), 0, 0, 4, 90, GraphicsUnit.Pixel, null);
-
-                DrawImage(g, DJMRessources.longnotehold, x - (90 / 2), y - (90 / 2), 90, 90);
-
+                DrawSolidTrail(g, HoldTrailBrush, x, y, eventData.VirtualDuration, 90);
+                DrawImageHd(g, TechnikaHdAssets.HoldHead, x - (90 / 2), y - (90 / 2), 90, 90);
             }
             else if (eventData.Attribute == (byte)EventAttribute.VideoStart)
             { // Video Start
@@ -256,6 +224,72 @@ namespace DJMaxEditor.Controls.Editor.Renderers.Events
             {
                 DrawImage(g, DJMRessources.unknowNote, x - (90 / 2), y - (90 / 2), 90, 90);
             }
+        }
+
+        // Draws an image with its full source rectangle mapped to the destination,
+        // so every pixel of the HD art feeds the zoom transform.
+        private static void DrawImageHd(GraphicsWrapper g, Image image, int x, int y, int width, int height)
+        {
+            if (image == null)
+            {
+                return;
+            }
+            g.DrawImage(
+                image,
+                new Rectangle(x, y, width, height),
+                0,
+                0,
+                image.Width,
+                image.Height,
+                GraphicsUnit.Pixel,
+                null);
+        }
+
+        // Drag-note body: flat left slice stretched across the hold, then the frame
+        // again so the rounded tip lands just past the hold end.
+        private static void DrawDragBody(GraphicsWrapper g, Image body, int x, int y, int duration, int height)
+        {
+            if (body == null || duration <= 0)
+            {
+                return;
+            }
+            int half = height / 2;
+            g.DrawImage(
+                body,
+                new Rectangle(x, y - half, duration, height),
+                0,
+                0,
+                2,
+                body.Height,
+                GraphicsUnit.Pixel,
+                null);
+            g.DrawImage(
+                body,
+                new Rectangle(x + duration + 25 - height, y - half, height, height),
+                0,
+                0,
+                body.Width,
+                body.Height,
+                GraphicsUnit.Pixel,
+                null);
+        }
+
+        // Hold/repeat trails are single-color solid bars in Technika, drawn
+        // semi-transparent so the lane grid stays readable underneath.
+        private static readonly Brush HoldTrailBrush =
+            new SolidBrush(Color.FromArgb(120, 45, 100, 235));
+
+        private static readonly Brush RepeatTrailBrush =
+            new SolidBrush(Color.FromArgb(120, 155, 65, 225));
+
+        private static void DrawSolidTrail(GraphicsWrapper g, Brush brush, int x, int y, int duration, int height)
+        {
+            if (duration <= 0)
+            {
+                return;
+            }
+            int lineHeight = height / 3;
+            g.FillRectangle(brush, x, y - lineHeight / 2, duration, lineHeight);
         }
     }
 }

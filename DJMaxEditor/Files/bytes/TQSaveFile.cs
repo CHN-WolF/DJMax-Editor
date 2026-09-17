@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -83,12 +83,21 @@ namespace DJMaxEditor.Files.bytes
                     track.Write(new byte[] { 0, 0, 0, 0 }, 0, 4);
                     track.Write(new byte[] { 0 }, 0, 1);
 
-                    int eventsCount = td.Events.Count();
+                    // Only note/volume/tempo events exist in this format; anything else
+                    // (e.g. beat events from pt charts) must be excluded so the declared
+                    // event count matches the bytes actually written.
+                    var writableEvents = td.Events
+                        .Where(evnt => evnt.EventType == EventType.Note ||
+                            evnt.EventType == EventType.Volume ||
+                            evnt.EventType == EventType.Tempo)
+                        .ToList();
+
+                    int eventsCount = writableEvents.Count;
                     track.Write(BitConverter.GetBytes(eventsCount << 4), 0, 4);
                     track.Write(BitConverter.GetBytes(eventsCount), 0, 4);
 
 
-                    foreach (EventData evnt in td.Events)
+                    foreach (EventData evnt in writableEvents)
                     {
                         track.Write(BitConverter.GetBytes(evnt.Tick), 0, 4);
 

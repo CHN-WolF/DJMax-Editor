@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -85,6 +85,27 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces">
+      <HintPath>..\packages\microsoft.bcl.asyncinterfaces.8.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Buffers">
+      <HintPath>..\packages\system.buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>..\packages\system.memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>..\packages\system.runtime.compilerservices.unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web">
+      <HintPath>..\packages\system.text.encodings.web.8.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>..\packages\system.text.json.8.0.5\lib\net462\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions">
+      <HintPath>..\packages\system.threading.tasks.extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AboutForm.cs">
@@ -129,7 +150,7 @@
     <Compile Include="Editor\LegacyEditorSurfaceAdapter.cs" />
     <Compile Include="FeatureFlags.cs" />
     <Compile Include="Preview\GameplayPreviewControl.cs">
-      <SubType>UserControl</SubType>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="Preview\GameplayPreviewForm.cs">
       <SubType>Form</SubType>
@@ -169,6 +190,7 @@
     <Compile Include="Controls\Editor\Renderers\Events\EventRenderer.cs" />
     <Compile Include="Controls\Editor\Renderers\Events\Trilogy\TrilogyEventRenderer.cs" />
     <Compile Include="Controls\Editor\Renderers\Renderer.cs" />
+    <Compile Include="Controls\Editor\Renderers\TechnikaHdAssets.cs" />
     <Compile Include="Controls\Editor\Renderers\TracksRenderer.cs" />
     <Compile Include="Controls\Editor\Renderers\ZonesRenderer.cs" />
     <Compile Include="Controls\Editor\Renderers\Zones\Cyclon\CyclonZoneRenderer.cs" />
@@ -182,6 +204,13 @@
     <Compile Include="Controls\Editor\Renderers\Zones\Trilogy\Trilogy8kZoneRenderer.cs" />
     <Compile Include="Controls\Editor\Renderers\Zones\ZoneRenderer.cs" />
     <Compile Include="Controls\Editor\RenderTimer.cs" />
+    <Compile Include="Files\tech\TechmaniaChartSerializer.cs" />
+    <Compile Include="Files\tech\TechmaniaChartWriter.cs" />
+    <Compile Include="Files\tech\TechPatternPickerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Files\tech\TechOpenFile.cs" />
+    <Compile Include="Files\tech\TechSaveFile.cs" />
     <Compile Include="Files\bms\BMESaveFile.cs" />
     <Compile Include="Files\bms\BmsChartSerializer.cs" />
     <Compile Include="Files\bms\BmsonChartSerializer.cs" />
@@ -405,6 +434,9 @@
     <Compile Include="libs\fmod\fmodex\fmod_errors.cs" />
     <Compile Include="libs\fmod\fmodex\fmod_memoryinfo.cs" />
     <Compile Include="Logs.cs" />
+    <Compile Include="FindSoundNotesForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="PlayerEventsListProxy.cs" />
     <Compile Include="PlayTickDialog.cs">
       <SubType>Form</SubType>
@@ -414,6 +446,10 @@
     </Compile>
     <Compile Include="ProgressBar.cs" />
     <Compile Include="PropertyLayer\BeatEventPropertiesLayer.cs" />
+    <Compile Include="PropertyLayer\MultiBeatPropertiesLayer.cs" />
+    <Compile Include="PropertyLayer\MultiNotePropertiesLayer.cs" />
+    <Compile Include="PropertyLayer\MultiTempoPropertiesLayer.cs" />
+    <Compile Include="PropertyLayer\MultiVolumePropertiesLayer.cs" />
     <Compile Include="PropertyLayer\NoteEventPropertiesLayer.cs" />
     <Compile Include="PropertyLayer\PropertiesLayerBase.cs" />
     <Compile Include="PropertyLayer\TempoEventPropertiesLayer.cs" />
@@ -426,6 +462,8 @@
     <Compile Include="DJMax\Player.cs" />
     <Compile Include="libs\CustomTimer.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="SingleInstance.cs" />
+    <Compile Include="FileAssociations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Files\pt\PTOpenFile.cs" />
     <Compile Include="Panels\ToolWindow.cs">
@@ -505,6 +543,27 @@
     <EmbeddedResource Include="Resources\TechmaniaNotes\RepeatHead.png">
       <LogicalName>DJMaxEditor.TechmaniaNotes.RepeatHead.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\Basic.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.Basic.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\LongHead.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.LongHead.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\HoldHead.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.HoldHead.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\RepeatHead.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.RepeatHead.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\PressEnd.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.PressEnd.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\RepeatTail.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.RepeatTail.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\TechnikaHD\LongBody.png">
+      <LogicalName>DJMaxEditor.TechnikaHD.LongBody.png</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Panels\PropertiesForm.resx">
       <DependentUpon>PropertiesForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -571,6 +630,11 @@
     <None Include="Resources\Soundfile_461.png" />
     <None Include="Resources\Open_6529.png" />
     <None Include="Resources\save_16xLG.png" />
+    <None Include="Resources\zw_open_16.png" />
+    <None Include="Resources\zw_save_16.png" />
+    <None Include="Resources\zw_saveas_16.png" />
+    <None Include="Resources\zw_undo_16.png" />
+    <None Include="Resources\zw_redo_16.png" />
     <None Include="Resources\fmod.png" />
     <None Include="Resources\properties_16xLG.png" />
     <None Include="Resources\Edit_UndoHS.png" />

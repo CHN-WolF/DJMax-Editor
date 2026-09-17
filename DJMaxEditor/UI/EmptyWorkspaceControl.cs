@@ -40,7 +40,7 @@ namespace DJMaxEditor.UI
                 StudioDesignSystem.Frost,
                 StudioDesignSystem.DisplayFont(18f));
             var detail = CreateLabel(
-                "Open PT, Respect V, XML, BMS, BME, BML, or PMS. Detection and safety rules stay active.",
+                "Open PT, Technika Q, XML, BMS, BME, BML, or PMS. Detection and safety rules stay active.",
                 new Point(38, 112),
                 new Size(474, 42),
                 StudioDesignSystem.Muted,

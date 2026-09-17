@@ -55,11 +55,11 @@ namespace DJMaxEditor.Editor
                 CanSave = canEdit,
                 CanConvert = model.SourceFormat.HasValue,
                 StatusLabel = isRespectV
-                    ? (canEdit ? "RESPECT V - EDITABLE (BMS EXPORT)" : "RESPECT V - READ ONLY")
+                    ? (canEdit ? "TECHNIKA Q - EDITABLE" : "TECHNIKA Q - READ ONLY")
                     : (model.IsReadOnly ? "READ ONLY" : "EDITABLE"),
                 EditBlockReason = canEdit ? string.Empty :
                     (isRespectV
-                        ? "Respect V charts are read-only because lossless round-trip compatibility is not verified."
+                        ? "Technika Q charts are read-only because lossless round-trip compatibility is not verified."
                         : "This chart is read-only and cannot be modified.")
             };
         }

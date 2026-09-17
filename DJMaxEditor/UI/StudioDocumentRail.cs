@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace DJMaxEditor.UI
 {
     public sealed class StudioDocumentRail : UserControl
     {
+        private const int ToolbarIconSize = 18;
+
         private readonly Label _documentLabel;
         private readonly Label _formatChip;
         private readonly Label _capabilityChip;
@@ -15,6 +19,20 @@ namespace DJMaxEditor.UI
         private readonly Button _workspace;
         private readonly Button _palette;
         private readonly ContextMenuStrip _workspaceMenu;
+        private readonly Button _openButton;
+        private readonly Button _saveButton;
+        private readonly Button _saveAsButton;
+        private readonly Button _undoButton;
+        private readonly Button _redoButton;
+        private readonly Button _followButton;
+        private readonly Button _selectFilterButton;
+        private readonly Button _selectFilterMenuButton;
+        private readonly ContextMenuStrip _selectFilterMenu;
+        private readonly Image _selectFilterCheckIcon;
+        private readonly List<KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>> _selectFilterItems =
+            new List<KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>>();
+        private readonly Button _zoomButton;
+        private readonly ToolTip _toolTip;
 
         public StudioDocumentRail()
         {
@@ -25,8 +43,63 @@ namespace DJMaxEditor.UI
             MinimumSize = new Size(760, 44);
             Padding = new Padding(12, 5, 10, 5);
 
-            var brand = CreateLabel("DJMAX  //  CHART STUDIO", 188, StudioDesignSystem.PulseCyan);
-            brand.Font = StudioDesignSystem.DisplayFont(10f);
+            _toolTip = new ToolTip();
+            _openButton = CreateIconButton(ScaleIcon(Resources.zw_open_16), "Open");
+            _saveButton = CreateIconButton(ScaleIcon(Resources.zw_save_16), "Save");
+            _saveAsButton = CreateIconButton(ScaleIcon(Resources.zw_saveas_16), "Save As");
+            _undoButton = CreateIconButton(ScaleIcon(Resources.zw_undo_16), "Undo");
+            _redoButton = CreateIconButton(ScaleIcon(Resources.zw_redo_16), "Redo");
+            _followButton = CreateIconButton(
+                StudioTheme.CreatePlayIcon(StudioDesignSystem.PulseCyan),
+                "Follow Playback");
+            _selectFilterButton = CreateIconButton(ScaleIcon(Resources.zw_filter_16), "Select Filter");
+            _selectFilterMenuButton = CreateIconButton(ScaleIcon(Resources.zw_arrowdown_16), "Select Filter options");
+            _selectFilterMenuButton.Margin = new Padding(0, 3, 2, 3);
+            _selectFilterMenuButton.Width = 22;
+            _selectFilterCheckIcon = CreateCheckIcon();
+            _selectFilterMenu = BuildSelectFilterMenu();
+            _zoomButton = StudioDesignSystem.CreateDeckButton("100%");
+            _zoomButton.AutoSize = true;
+            _zoomButton.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            _zoomButton.MinimumSize = new Size(0, 27);
+            _zoomButton.Margin = new Padding(3, 3, 3, 3);
+            _zoomButton.Font = StudioDesignSystem.BodyFont(8.5f, FontStyle.Bold);
+            _zoomButton.ForeColor = StudioDesignSystem.Muted;
+            _zoomButton.Click += delegate { if (ZoomResetRequested != null) ZoomResetRequested(this, EventArgs.Empty); };
+            _toolTip.SetToolTip(_zoomButton, "Reset zoom to 100%");
+
+            _openButton.Click += delegate { if (OpenRequested != null) OpenRequested(this, EventArgs.Empty); };
+            _saveButton.Click += delegate { if (SaveRequested != null) SaveRequested(this, EventArgs.Empty); };
+            _saveAsButton.Click += delegate { if (SaveAsRequested != null) SaveAsRequested(this, EventArgs.Empty); };
+            _undoButton.Click += delegate { if (UndoRequested != null) UndoRequested(this, EventArgs.Empty); };
+            _redoButton.Click += delegate { if (RedoRequested != null) RedoRequested(this, EventArgs.Empty); };
+            _followButton.Click += delegate { if (FollowPlaybackRequested != null) FollowPlaybackRequested(this, EventArgs.Empty); };
+            _selectFilterButton.Click += delegate { if (SelectFilterToggleRequested != null) SelectFilterToggleRequested(this, EventArgs.Empty); };
+            _selectFilterMenuButton.Click += delegate
+            {
+                _selectFilterMenu.Show(_selectFilterMenuButton, new Point(0, _selectFilterMenuButton.Height));
+            };
+
+            var toolbar = new FlowLayoutPanel
+            {
+                AutoSize = false,
+                BackColor = StudioDesignSystem.Deck,
+                Dock = DockStyle.Left,
+                FlowDirection = FlowDirection.LeftToRight,
+                Height = 34,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                Width = 380,
+                WrapContents = false
+            };
+            toolbar.Controls.Add(_openButton);
+            toolbar.Controls.Add(_saveButton);
+            toolbar.Controls.Add(_saveAsButton);
+            toolbar.Controls.Add(_undoButton);
+            toolbar.Controls.Add(_redoButton);
+            toolbar.Controls.Add(_followButton);
+            toolbar.Controls.Add(_selectFilterButton);
+            toolbar.Controls.Add(_selectFilterMenuButton);
 
             _documentLabel = CreateLabel("NO DOCUMENT", 230, StudioDesignSystem.Frost);
             _documentLabel.AutoEllipsis = true;
@@ -35,11 +108,11 @@ namespace DJMaxEditor.UI
             _formatChip = CreateChip("NO SOURCE", StudioDesignSystem.Muted);
             _capabilityChip = CreateChip("OPEN A CHART", StudioDesignSystem.SignalAmber);
 
-            _timelineV1 = CreateRailButton("V1");
-            _timelineV2 = CreateRailButton("V2");
-            _preview = CreateRailButton("PREVIEW", 76);
-            _workspace = CreateRailButton("WORKSPACE  ▾", 104);
-            _palette = CreateRailButton("COMMANDS  Ctrl+K", 132);
+            _timelineV1 = CreateRailButton("TIMELINE V1");
+            _timelineV2 = CreateRailButton("TIMELINE V2");
+            _preview = CreateRailButton("PREVIEW");
+            _workspace = CreateRailButton("WORKSPACE  ▾");
+            _palette = CreateRailButton("COMMANDS  Ctrl+K");
             _workspaceMenu = BuildWorkspaceMenu();
 
             _timelineV1.Click += delegate { if (TimelineV1Requested != null) TimelineV1Requested(this, EventArgs.Empty); };
@@ -53,16 +126,17 @@ namespace DJMaxEditor.UI
 
             var right = new FlowLayoutPanel
             {
-                AutoSize = false,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 BackColor = StudioDesignSystem.Deck,
                 Dock = DockStyle.Right,
                 FlowDirection = FlowDirection.LeftToRight,
                 Height = 34,
                 Margin = Padding.Empty,
                 Padding = Padding.Empty,
-                Width = 690,
                 WrapContents = false
             };
+            right.Controls.Add(_zoomButton);
             right.Controls.Add(_formatChip);
             right.Controls.Add(_capabilityChip);
             right.Controls.Add(_timelineV1);
@@ -73,12 +147,17 @@ namespace DJMaxEditor.UI
 
             Controls.Add(_documentLabel);
             Controls.Add(right);
-            Controls.Add(brand);
+            Controls.Add(toolbar);
             right.BringToFront();
             _documentLabel.BringToFront();
 
             ShowEmpty();
             SetActiveSurface(false);
+            SetDocumentState(false);
+            SetEditState(false, false);
+            SetFollowPlayback(false);
+            SetSelectFilter(false, EventSelectMode.SpecialEventKind.Volume);
+            SetZoomPercent(100);
         }
 
         public event EventHandler TimelineV1Requested;
@@ -86,6 +165,17 @@ namespace DJMaxEditor.UI
         public event EventHandler PreviewRequested;
         public event EventHandler<StudioWorkspaceRequestedEventArgs> WorkspaceRequested;
         public event EventHandler CommandPaletteRequested;
+        public event EventHandler OpenRequested;
+        public event EventHandler SaveRequested;
+        public event EventHandler SaveAsRequested;
+        public event EventHandler UndoRequested;
+        public event EventHandler RedoRequested;
+        public event EventHandler FollowPlaybackRequested;
+        public event EventHandler SelectFilterToggleRequested;
+        public event EventHandler SelectFilterKindRequested;
+        public event EventHandler ZoomResetRequested;
+
+        internal EventSelectMode.SpecialEventKind SelectedFilterKind { get; private set; }
 
         public StudioWorkspacePreset[] WorkspacePresets
         {
@@ -136,6 +226,99 @@ namespace DJMaxEditor.UI
             SurfaceName = timelineV2 ? "TIMELINE V2" : "TIMELINE V1";
             StyleSegment(_timelineV1, !timelineV2);
             StyleSegment(_timelineV2, timelineV2);
+        }
+
+        public void SetDocumentState(bool hasDocument)
+        {
+            _saveButton.Enabled = hasDocument;
+            _saveAsButton.Enabled = hasDocument;
+        }
+
+        public void SetEditState(bool canUndo, bool canRedo)
+        {
+            _undoButton.Enabled = canUndo;
+            _redoButton.Enabled = canRedo;
+        }
+
+        public void SetFollowPlayback(bool following)
+        {
+            StyleSegment(_followButton, following);
+        }
+
+        internal void SetSelectFilter(bool enabled, EventSelectMode.SpecialEventKind kind)
+        {
+            SelectedFilterKind = kind;
+            StyleSegment(_selectFilterButton, enabled);
+            foreach (var pair in _selectFilterItems)
+            {
+                pair.Key.Image = pair.Value == kind ? _selectFilterCheckIcon : null;
+            }
+            _toolTip.SetToolTip(
+                _selectFilterButton,
+                enabled ? "Select Filter: " + kind.ToString().ToUpperInvariant() : "Select Filter");
+        }
+
+        private ContextMenuStrip BuildSelectFilterMenu()
+        {
+            var menu = new ContextMenuStrip
+            {
+                BackColor = StudioDesignSystem.Deck,
+                Font = StudioDesignSystem.BodyFont(9f),
+                ForeColor = StudioDesignSystem.Frost,
+                ShowImageMargin = true
+            };
+            menu.Renderer = new StudioToolStripRenderer(false);
+            AddSelectFilterItem(menu, "VOLUME", EventSelectMode.SpecialEventKind.Volume);
+            AddSelectFilterItem(menu, "TEMPO", EventSelectMode.SpecialEventKind.Tempo);
+            AddSelectFilterItem(menu, "BEAT", EventSelectMode.SpecialEventKind.Beat);
+            AddSelectFilterItem(menu, "VIDEOSTART", EventSelectMode.SpecialEventKind.VideoStart);
+            return menu;
+        }
+
+        private void AddSelectFilterItem(
+            ContextMenuStrip menu,
+            string label,
+            EventSelectMode.SpecialEventKind kind)
+        {
+            var item = new ToolStripMenuItem(label)
+            {
+                BackColor = StudioDesignSystem.Deck,
+                ForeColor = StudioDesignSystem.Frost
+            };
+            item.Click += delegate
+            {
+                SelectedFilterKind = kind;
+                if (SelectFilterKindRequested != null) SelectFilterKindRequested(this, EventArgs.Empty);
+            };
+            _selectFilterItems.Add(
+                new KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>(item, kind));
+            menu.Items.Add(item);
+        }
+
+        private static Image CreateCheckIcon()
+        {
+            var bitmap = new Bitmap(16, 16);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            using (var pen = new Pen(StudioDesignSystem.PulseCyan, 2f))
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.DrawLines(pen, new[]
+                {
+                    new Point(3, 8),
+                    new Point(7, 12),
+                    new Point(13, 4)
+                });
+            }
+            return bitmap;
+        }
+
+        public void SetZoomPercent(int percent)
+        {
+            string text = percent + "%";
+            if (_zoomButton.Text != text)
+            {
+                _zoomButton.Text = text;
+            }
         }
 
         public void RequestWorkspace(StudioWorkspacePreset preset)
@@ -195,27 +378,51 @@ namespace DJMaxEditor.UI
         {
             return new Label
             {
-                AutoEllipsis = true,
+                AutoSize = true,
                 BackColor = StudioDesignSystem.Lift,
                 BorderStyle = BorderStyle.FixedSingle,
-                Font = StudioDesignSystem.UtilityFont(7.5f),
+                Font = StudioDesignSystem.BodyFont(8.5f, FontStyle.Bold),
                 ForeColor = foreground,
-                Height = 27,
                 Margin = new Padding(3, 3, 3, 3),
+                MinimumSize = new Size(0, 27),
                 Padding = new Padding(8, 5, 8, 0),
                 Text = text,
-                TextAlign = ContentAlignment.TopCenter,
-                Width = 112
+                TextAlign = ContentAlignment.TopCenter
             };
         }
 
-        private static Button CreateRailButton(string text, int width = 38)
+        private static Button CreateRailButton(string text)
         {
             Button button = StudioDesignSystem.CreateDeckButton(text);
+            button.AutoSize = true;
+            button.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            button.MinimumSize = new Size(0, 28);
+            button.Margin = new Padding(2, 3, 2, 3);
+            return button;
+        }
+
+        private Button CreateIconButton(Image image, string toolTipText)
+        {
+            Button button = StudioDesignSystem.CreateDeckButton(string.Empty);
             button.Height = 28;
             button.Margin = new Padding(2, 3, 2, 3);
-            button.Width = width;
+            button.Width = 34;
+            button.Image = image;
+            button.ImageAlign = ContentAlignment.MiddleCenter;
+            _toolTip.SetToolTip(button, toolTipText);
             return button;
+        }
+
+        private static Bitmap ScaleIcon(Bitmap master)
+        {
+            var scaled = new Bitmap(ToolbarIconSize, ToolbarIconSize);
+            using (Graphics graphics = Graphics.FromImage(scaled))
+            {
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                graphics.DrawImage(master, 0, 0, ToolbarIconSize, ToolbarIconSize);
+            }
+            return scaled;
         }
 
         private static void StyleSegment(Button button, bool active)

@@ -24,6 +24,12 @@ namespace DJMaxEditor.Files.FormatDetection
         /// <summary>Classic text BMS family (.bms/.bme/.bml/.pms).</summary>
         BmsClassic,
 
+        /// <summary>
+        /// TECHMANIA native track file (track.tech, format version "3"): JSON container of
+        /// patterns with pipe-packed note strings, imported onto the TECHNIKA layout.
+        /// </summary>
+        TechmaniaTrack,
+
         /// <summary>A file that matches no known chart signature.</summary>
         Unknown,
 

@@ -1,16 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.ComponentModel;
 using DJMaxEditor.DJMax;
+using DJMaxEditor.Editor;
 
 namespace DJMaxEditor.PropertyLayer
 {
     public class NoteEventPropertiesLayer : PropertiesLayerBase
     {
-        public NoteEventPropertiesLayer (EventData eventData)
-            : base(eventData)
+        public NoteEventPropertiesLayer (EventData eventData, ChartEditController edits = null)
+            : base(eventData, edits)
         { }
 
         /// <summary>
@@ -22,7 +23,14 @@ namespace DJMaxEditor.PropertyLayer
                 return _eventData.Duration;
             }
             set {
-                _eventData.Duration = value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionDuration(value);
+                }
+                else
+                {
+                    _eventData.Duration = value;
+                }
             }
         }
 
@@ -36,7 +44,14 @@ namespace DJMaxEditor.PropertyLayer
             }
 
             set {
-                _eventData.Pan = value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionPan(value);
+                }
+                else
+                {
+                    _eventData.Pan = value;
+                }
             }
         }
 
@@ -46,7 +61,14 @@ namespace DJMaxEditor.PropertyLayer
                 return (EventAttribute)_eventData.Attribute;
             }
             set {
-                _eventData.Attribute = (byte)value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionAttribute((byte)value);
+                }
+                else
+                {
+                    _eventData.Attribute = (byte)value;
+                }
             }
         }
 
@@ -56,7 +78,14 @@ namespace DJMaxEditor.PropertyLayer
                 return _eventData.Attribute;
             }
             set {
-                _eventData.Attribute = value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionAttribute(value);
+                }
+                else
+                {
+                    _eventData.Attribute = value;
+                }
             }
         }
 
@@ -96,7 +125,14 @@ namespace DJMaxEditor.PropertyLayer
             }
             set
             {
-                _eventData.Vel = value;
+                if (_edits != null)
+                {
+                    _edits.SetSelectionVel(value);
+                }
+                else
+                {
+                    _eventData.Vel = value;
+                }
             }
         }
 

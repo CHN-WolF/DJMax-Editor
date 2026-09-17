@@ -8,8 +8,9 @@ namespace DJMaxEditor.Controls.TimelineV2
     /// </summary>
     public sealed class TimelineViewport
     {
+        public const double DefaultPixelsPerTick = 0.25;
         private double _originTick;
-        private double _pixelsPerTick = 0.25;
+        private double _pixelsPerTick = DefaultPixelsPerTick;
         private int _viewportWidth;
         private int _headerWidth;
 

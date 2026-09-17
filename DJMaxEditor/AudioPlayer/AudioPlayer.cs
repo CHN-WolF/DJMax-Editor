@@ -1,4 +1,4 @@
-﻿namespace DJMaxEditor
+namespace DJMaxEditor
 {
     public interface IAudioPlayer
     {
@@ -19,5 +19,13 @@
         bool PlaySound(uint channelIndex, uint soundIndex, float volume, byte pan, uint offset = 0);
 
         object GetDebugInfo();
+
+        void SetSoundContext(string key);
+
+        bool IsSoundContextLoaded(string key);
+
+        void MarkSoundContextLoaded(string key);
+
+        void ReleaseSoundContext(string key);
     }
 }

@@ -54,5 +54,11 @@ namespace DJMaxEditor.Editor
         {
             Capabilities = DocumentCapabilities.Resolve(Model);
         }
+
+        public void SetSourcePath(string sourcePath)
+        {
+            SourcePath = sourcePath;
+            RefreshCapabilities();
+        }
     }
 }

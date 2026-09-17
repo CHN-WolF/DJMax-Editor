@@ -289,7 +289,6 @@ namespace DJMaxEditor.Tests
                     {
                         StudioWorkspacePreset.Editing,
                         StudioWorkspacePreset.Preview,
-                        StudioWorkspacePreset.Audio,
                         StudioWorkspacePreset.Compact
                     }), "workspace rail is missing a production preset");
 

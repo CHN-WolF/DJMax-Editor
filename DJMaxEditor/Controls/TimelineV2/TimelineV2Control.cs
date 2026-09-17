@@ -57,7 +57,7 @@ namespace DJMaxEditor.Controls.TimelineV2
                 ControlStyles.Selectable |
                 ControlStyles.UserPaint,
                 true);
-            _coordinates = CreateCoordinates(1f, 0.25);
+            _coordinates = CreateCoordinates(1f, TimelineViewport.DefaultPixelsPerTick);
         }
 
         public Control View
@@ -182,6 +182,16 @@ namespace DJMaxEditor.Controls.TimelineV2
             return true;
         }
 
+        public float TimeZoom
+        {
+            get
+            {
+                return (float)(_viewport == null
+                    ? _coordinates.PixelsPerTick
+                    : _viewport.PixelsPerTick);
+            }
+        }
+
         public EditorViewState CaptureViewState()
         {
             return new EditorViewState
@@ -193,6 +203,14 @@ namespace DJMaxEditor.Controls.TimelineV2
                 FirstVisibleRow = _firstVisibleRow,
                 PlayheadVirtualTick = PlayheadVirtualTick
             };
+        }
+
+        public void RevealPosition(int virtualTick, int trackIndex)
+        {
+            if (_viewport == null) return;
+
+            _viewport.OriginTick = virtualTick - (_viewport.VisibleTickCount / 2);
+            RequestRepaint();
         }
 
         public void RestoreViewState(EditorViewState state)
@@ -521,7 +539,9 @@ namespace DJMaxEditor.Controls.TimelineV2
         private static string BuildStatusText(EditorDocumentContext document)
         {
             string format = document.Capabilities.SourceFormat.HasValue
-                ? document.Capabilities.SourceFormat.Value.ToString()
+                ? (document.Capabilities.SourceFormat.Value == DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV
+                    ? "Technika Q"
+                    : document.Capabilities.SourceFormat.Value.ToString())
                 : "Unknown format";
             string encryption = document.Capabilities.IsEncrypted
                 ? " | ENCRYPTED SOURCE / DECRYPTED IN MEMORY"

@@ -153,6 +153,171 @@ namespace DJMaxEditor.Editor
             return true;
         }
 
+        public bool SetSelectionVolume(byte volume)
+        {
+            return SetSelectionProperty(SetEventPropertiesAction.EventPropertyKind.Volume, volume);
+        }
+
+        public bool SetSelectionVel(byte vel)
+        {
+            return SetSelectionProperty(SetEventPropertiesAction.EventPropertyKind.Vel, vel);
+        }
+
+        public bool SetSelectionPan(byte pan)
+        {
+            return SetSelectionProperty(SetEventPropertiesAction.EventPropertyKind.Pan, pan);
+        }
+
+        public bool SetSelectionDuration(ushort duration)
+        {
+            if (!CanMutateSelection() ||
+                duration > ushort.MaxValue / EventData.VirtualTickSize)
+            {
+                return false;
+            }
+
+            var changes = new List<SetEventPropertiesAction.EventPropertyChange>();
+            foreach (EventData item in _document.Selection.Items)
+            {
+                if (item.EventType != EventType.Note || item.Duration == duration)
+                {
+                    continue;
+                }
+                changes.Add(new SetEventPropertiesAction.EventPropertyChange(
+                    item,
+                    SetEventPropertiesAction.EventPropertyKind.Duration,
+                    item.Duration,
+                    duration));
+            }
+            if (changes.Count == 0)
+            {
+                return false;
+            }
+            _undo.ExecAction(new SetEventPropertiesAction(changes));
+            return true;
+        }
+
+        public bool SetSelectionTempo(float tempo)
+        {
+            if (!CanMutateSelection())
+            {
+                return false;
+            }
+
+            var changes = new List<SetEventPropertiesAction.EventPropertyChange>();
+            foreach (EventData item in _document.Selection.Items)
+            {
+                if (item.EventType != EventType.Tempo || item.Tempo == tempo)
+                {
+                    continue;
+                }
+                changes.Add(new SetEventPropertiesAction.EventPropertyChange(
+                    item,
+                    SetEventPropertiesAction.EventPropertyKind.Tempo,
+                    item.Tempo,
+                    tempo));
+            }
+            if (changes.Count == 0)
+            {
+                return false;
+            }
+            _undo.ExecAction(new SetEventPropertiesAction(changes));
+            return true;
+        }
+
+        public bool SetSelectionBeat(ushort beat)
+        {
+            if (!CanMutateSelection())
+            {
+                return false;
+            }
+
+            var changes = new List<SetEventPropertiesAction.EventPropertyChange>();
+            foreach (EventData item in _document.Selection.Items)
+            {
+                if (item.EventType != EventType.Beat || item.Beat == beat)
+                {
+                    continue;
+                }
+                changes.Add(new SetEventPropertiesAction.EventPropertyChange(
+                    item,
+                    SetEventPropertiesAction.EventPropertyKind.Beat,
+                    item.Beat,
+                    beat));
+            }
+            if (changes.Count == 0)
+            {
+                return false;
+            }
+            _undo.ExecAction(new SetEventPropertiesAction(changes));
+            return true;
+        }
+
+        public bool SetSelectionInstrument(InstrumentData instrument)
+        {
+            if (!CanMutateSelection() || instrument == null)
+            {
+                return false;
+            }
+
+            var changes = new List<SetSoundsAction.EventSoundChange>();
+            foreach (EventData item in _document.Selection.Items)
+            {
+                if (object.ReferenceEquals(item.Instrument, instrument))
+                {
+                    continue;
+                }
+                changes.Add(new SetSoundsAction.EventSoundChange(item, item.Instrument, instrument));
+            }
+            if (changes.Count == 0)
+            {
+                return false;
+            }
+            _undo.ExecAction(new SetSoundsAction(changes));
+            return true;
+        }
+
+        private bool SetSelectionProperty(SetEventPropertiesAction.EventPropertyKind property, int value)
+        {
+            if (!CanMutateSelection())
+            {
+                return false;
+            }
+
+            var changes = new List<SetEventPropertiesAction.EventPropertyChange>();
+            foreach (EventData item in _document.Selection.Items)
+            {
+                int previous;
+                switch (property)
+                {
+                    case SetEventPropertiesAction.EventPropertyKind.Volume:
+                        previous = item.Volume;
+                        break;
+                    case SetEventPropertiesAction.EventPropertyKind.Vel:
+                        previous = item.Vel;
+                        break;
+                    default:
+                        previous = item.Pan;
+                        break;
+                }
+                if (previous == value)
+                {
+                    continue;
+                }
+                changes.Add(new SetEventPropertiesAction.EventPropertyChange(
+                    item,
+                    property,
+                    previous,
+                    value));
+            }
+            if (changes.Count == 0)
+            {
+                return false;
+            }
+            _undo.ExecAction(new SetEventPropertiesAction(changes));
+            return true;
+        }
+
         internal bool AddEvents(IEnumerable<EventData> events)
         {
             if (!_document.Capabilities.CanEdit || events == null)

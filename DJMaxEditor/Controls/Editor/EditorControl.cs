@@ -31,6 +31,8 @@ namespace DJMaxEditor
 
         public const float MaxZoom = 2f;
 
+        public const float DefaultZoom = 0.5f;
+
         // template event to add an event in PlayerData
         public EventData TemplateEvent = null;
 
@@ -132,6 +134,10 @@ namespace DJMaxEditor
             MouseWheel += DrawingArea_MouseWheel;
             DrawingArea.MouseWheel += DrawingArea_MouseWheel;
 
+            _autoScrollTimer = new Timer { Interval = 40 };
+            _autoScrollTimer.Tick += AutoScrollTimer_Tick;
+            Disposed += delegate { _autoScrollTimer.Dispose(); };
+
             SetStyle(ControlStyles.Selectable, true);
         }
 
@@ -146,82 +152,38 @@ namespace DJMaxEditor
             };
             _vScrollBarUpper.ValueChanged += vScrollBarUpper_ValueChanged;
 
-            _hScrollBarUpper = new HScrollBar
-            {
-                Height = 15,
-                LargeChange = 16,
-                SmallChange = 16
-            };
-            _hScrollBarUpper.ValueChanged += hScrollBarUpper_ValueChanged;
-            DrawingArea.Controls.Add(_hScrollBarUpper);
-            LayoutUpperHScrollBar();
-
-            var scrollPanel = new TableLayoutPanel
+            _scrollPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 Margin = new Padding(0),
                 ColumnCount = 1,
                 RowCount = 2
             };
-            scrollPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15F));
-            scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            _scrollPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15F));
+            _scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            _scrollPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
             tableLayoutPanel1.Controls.Remove(vScrollBar);
             vScrollBar.Dock = DockStyle.Fill;
-            scrollPanel.Controls.Add(_vScrollBarUpper, 0, 0);
-            scrollPanel.Controls.Add(vScrollBar, 0, 1);
-            tableLayoutPanel1.Controls.Add(scrollPanel, 1, 0);
+            _scrollPanel.Controls.Add(_vScrollBarUpper, 0, 0);
+            _scrollPanel.Controls.Add(vScrollBar, 0, 1);
+            tableLayoutPanel1.Controls.Add(_scrollPanel, 1, 0);
 
             tableLayoutPanel1.ColumnStyles[1].SizeType = SizeType.Absolute;
             tableLayoutPanel1.ColumnStyles[1].Width = 15F;
+
+            ApplySplitLayout();
         }
 
-        private void LayoutUpperHScrollBar()
+        private void ApplySplitLayout()
         {
-            if (_hScrollBarUpper == null)
+            if (_scrollPanel == null || _vScrollBarUpper == null)
             {
                 return;
             }
-            _hScrollBarUpper.SetBounds(
-                0,
-                Math.Max(0, UpperPaneHeight - _hScrollBarUpper.Height),
-                DrawingArea.Width,
-                _hScrollBarUpper.Height);
-        }
-
-        private void SyncUpperHScrollBar()
-        {
-            if (_hScrollBarUpper == null || _syncingHScrollBars)
-            {
-                return;
-            }
-            _syncingHScrollBars = true;
-            try
-            {
-                SetBarValue(_hScrollBarUpper, hScrollBar.Value);
-            }
-            finally
-            {
-                _syncingHScrollBars = false;
-            }
-        }
-
-        private void hScrollBarUpper_ValueChanged(object sender, EventArgs e)
-        {
-            if (_syncingHScrollBars)
-            {
-                return;
-            }
-            _syncingHScrollBars = true;
-            try
-            {
-                SetBarValue(hScrollBar, _hScrollBarUpper.Value);
-            }
-            finally
-            {
-                _syncingHScrollBars = false;
-            }
+            _vScrollBarUpper.Visible = _splitView;
+            _scrollPanel.RowStyles[0].Height = _splitView ? 50F : 0F;
+            _scrollPanel.RowStyles[1].Height = _splitView ? 50F : 100F;
         }
 
         private void vScrollBarUpper_ValueChanged(object sender, EventArgs e)
@@ -404,10 +366,7 @@ namespace DJMaxEditor
         public void Bind(EditorDocumentContext document)
         {
             if (document == null) throw new ArgumentNullException("document");
-            if (_documentContext != null)
-            {
-                _documentContext.Selection.SelectionChanged -= SharedSelectionChanged;
-            }
+            UnbindCurrentDocument();
             _documentContext = document;
             UndoManager = document.UndoManager;
             _documentContext.Selection.SelectionChanged += SharedSelectionChanged;
@@ -416,12 +375,26 @@ namespace DJMaxEditor
 
         public void Initialize(PlayerData playerData)
         {
+            UnbindCurrentDocument();
+            _documentContext = null;
+            InitializeCore(playerData, new ChartSelectionService());
+        }
+
+        private void UnbindCurrentDocument()
+        {
             if (_documentContext != null)
             {
                 _documentContext.Selection.SelectionChanged -= SharedSelectionChanged;
             }
-            _documentContext = null;
-            InitializeCore(playerData, new ChartSelectionService());
+            if (_playerData != null)
+            {
+                _playerData.Tracks.EventAdded -= NoteAddedOrRemoved;
+                _playerData.Tracks.EventRemoved -= NoteAddedOrRemoved;
+            }
+            if (UndoManager != null)
+            {
+                UndoManager.OnUndoRedo -= UndoManager_OnUndoRedo;
+            }
         }
 
         private void InitializeCore(PlayerData playerData, ChartSelectionService selection)
@@ -487,6 +460,22 @@ namespace DJMaxEditor
             return _zoom;
         }
 
+        /// <summary>
+        /// Next wheel zoom step on a 10%-of-default grid, so the default zoom
+        /// (100%) is always reachable no matter how many wheel events fired.
+        /// </summary>
+        public static float NextZoomStep(float current, int direction)
+        {
+            float gridStep = DefaultZoom / 10f;
+            int gridIndex = (int)Math.Round(current / gridStep) + Math.Sign(direction);
+            float zoom = gridIndex * gridStep;
+            if (Math.Abs(zoom - DefaultZoom) < gridStep / 2f)
+            {
+                zoom = DefaultZoom;
+            }
+            return Math.Min(MaxZoom, Math.Max(MinZoom, zoom));
+        }
+
         public void ScrollEditorPixel(int? x = null, int? y = null) 
         {
             if (x < 0) { x = 0; }
@@ -528,21 +517,43 @@ namespace DJMaxEditor
 
         private const int VirtualLeftMargin = EventsRenderer.VirtualNoteWidth / 2 + 4;
 
-        private const int UpperPaneTrackCount = 15;
+        private const int UpperPaneTrackCount = 16;
 
         private Rectangle _viewablePixels = new Rectangle();
 
         private VScrollBar _vScrollBarUpper;
 
-        private HScrollBar _hScrollBarUpper;
+        private TableLayoutPanel _scrollPanel;
 
-        private bool _syncingHScrollBars;
+        private bool _splitView;
 
         private bool _dragUpperPane;
 
+        private readonly Timer _autoScrollTimer;
+
+        private Point _autoScrollMouse;
+
+        public bool SplitViewEnabled
+        {
+            get { return _splitView; }
+            set
+            {
+                if (_splitView == value) return;
+                _splitView = value;
+                ApplySplitLayout();
+                UpdateScrollbars();
+                Redraw();
+                RaiseViewSettingsChanged();
+            }
+        }
+
         private int SplitTrackCount
         {
-            get { return Math.Min(UpperPaneTrackCount, _playerData == null ? 0 : _playerData.Tracks.Count); }
+            get
+            {
+                if (!_splitView) return 0;
+                return Math.Min(UpperPaneTrackCount, _playerData == null ? 0 : _playerData.Tracks.Count);
+            }
         }
 
         private int LowerPaneVirtualTop
@@ -552,7 +563,7 @@ namespace DJMaxEditor
 
         private int UpperPaneHeight
         {
-            get { return DrawingArea.Height / 2; }
+            get { return _splitView ? DrawingArea.Height / 2 : 0; }
         }
 
         private int UpperViewY
@@ -606,7 +617,7 @@ namespace DJMaxEditor
 
         private bool _isPlayerPlaying;
 
-        private float _zoom = 0.5f;
+        private float _zoom = DefaultZoom;
 
         private bool _ready = false;
 
@@ -712,18 +723,11 @@ namespace DJMaxEditor
             switch (Control.ModifierKeys)
             {
                 case Keys.Alt:
-                    var oldZoom = _zoom;
-
-                    if (e.Delta > 0) {
-                        oldZoom = oldZoom + 0.1f;
-                    } else if (e.Delta < 0) {
-                        oldZoom = oldZoom - 0.1f;
+                    float nextZoom = NextZoomStep(_zoom, e.Delta);
+                    if (nextZoom != _zoom)
+                    {
+                        SetZoom(nextZoom);
                     }
-
-                    oldZoom = Math.Min(oldZoom, MaxZoom);
-                    oldZoom = Math.Max(oldZoom, MinZoom);
-
-                    SetZoom(oldZoom);
                     break;
                 case Keys.Control:
                     ScrollEditorPixel(hScrollBar.Value - e.Delta / 4, null);
@@ -767,15 +771,23 @@ namespace DJMaxEditor
             }
 
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
             var beatSize = EventData.VirtualTickSize * _playerData.TickPerMinute;
             var blockSize = beatSize / _noteValue;
 
             int upperHeight = UpperPaneHeight;
-            DrawPane(g, gw, 0, upperHeight, 0, UpperViewY, beatSize, blockSize);
-            DrawPane(g, gw, upperHeight, DrawingArea.Height - upperHeight, LowerPaneVirtualTop, LowerViewY, beatSize, blockSize);
-            DrawPaneDivider(g, upperHeight);
+            if (_splitView)
+            {
+                DrawPane(g, gw, 0, upperHeight, 0, UpperViewY, beatSize, blockSize);
+                DrawPane(g, gw, upperHeight, DrawingArea.Height - upperHeight, LowerPaneVirtualTop, LowerViewY, beatSize, blockSize);
+                DrawPaneDivider(g, upperHeight);
+            }
+            else
+            {
+                DrawPane(g, gw, 0, DrawingArea.Height, 0, LowerViewY, beatSize, blockSize);
+            }
         }
 
         private void DrawPane(Graphics g, GraphicsWrapper gw, int screenTop, int screenHeight, int virtualTop, int viewY, int beatSize, int blockSize)
@@ -865,14 +877,6 @@ namespace DJMaxEditor
             hScrollBar.Value = Math.Min(hScrollBar.Value, Math.Max(hScrollBar.Minimum, hScrollBar.Maximum - hScrollBar.LargeChange));
             hScrollBar.Enabled = hScrollBar.Maximum > hScrollBar.LargeChange;
 
-            if (_hScrollBarUpper != null)
-            {
-                _hScrollBarUpper.Maximum = hScrollBar.Maximum;
-                _hScrollBarUpper.LargeChange = hScrollBar.LargeChange;
-                _hScrollBarUpper.Enabled = hScrollBar.Enabled;
-                SyncUpperHScrollBar();
-            }
-
             int upperPaneHeight = UpperPaneHeight;
             int lowerPaneHeight = Math.Max(1, DrawingArea.Height - upperPaneHeight);
 
@@ -904,10 +908,8 @@ namespace DJMaxEditor
             DrawingArea.Invalidate();
         }
 
-        private void hScrollBar_ValueChanged(object sender, EventArgs e) 
+        private void hScrollBar_ValueChanged(object sender, EventArgs e)
         {
-            SyncUpperHScrollBar();
-
             if (IsFollowing)
             {
                 return;
@@ -1131,6 +1133,10 @@ namespace DJMaxEditor
                 if (_selectMode != null)
                 {
                     _selectMode.MouseDrag(xx, yy);
+                    if (_selectMode.IsBoxSelecting)
+                    {
+                        UpdateBoxSelectAutoScroll(e.X, e.Y);
+                    }
                     shouldReDraw = true;
                 }
             }
@@ -1159,6 +1165,7 @@ namespace DJMaxEditor
         private void DrawingArea_MouseUp(object sender, MouseEventArgs e) 
         {
             _drag.Stop();
+            _autoScrollTimer.Stop();
 
             _selectMode?.MouseUp();
             _activeMoveUndoGroup = null;
@@ -1172,6 +1179,77 @@ namespace DJMaxEditor
             {
                 Redraw();
             }
+        }
+
+        /// <summary>
+        /// Auto scroll step in screen pixels for a mouse overshoot beyond the editor edge
+        /// </summary>
+        private static int AutoScrollStep(int overshoot)
+        {
+            return Math.Min(48, 8 + overshoot / 4);
+        }
+
+        /// <summary>
+        /// Track the box selection mouse position and toggle edge auto scrolling
+        /// </summary>
+        private void UpdateBoxSelectAutoScroll(int x, int y)
+        {
+            _autoScrollMouse = new Point(x, y);
+
+            bool outside = x < 0 || x > DrawingArea.Width || y < 0 || y > DrawingArea.Height;
+            if (outside)
+            {
+                if (!_autoScrollTimer.Enabled)
+                {
+                    _autoScrollTimer.Start();
+                }
+            }
+            else
+            {
+                _autoScrollTimer.Stop();
+            }
+        }
+
+        private void AutoScrollTimer_Tick(object sender, EventArgs e)
+        {
+            if (_selectMode == null || !_selectMode.IsBoxSelecting)
+            {
+                _autoScrollTimer.Stop();
+                return;
+            }
+
+            int x = _autoScrollMouse.X;
+            int y = _autoScrollMouse.Y;
+
+            int dx = 0;
+            if (x < 0) dx = -AutoScrollStep(-x);
+            else if (x > DrawingArea.Width) dx = AutoScrollStep(x - DrawingArea.Width);
+
+            int dy = 0;
+            if (y < 0) dy = -AutoScrollStep(-y);
+            else if (y > DrawingArea.Height) dy = AutoScrollStep(y - DrawingArea.Height);
+
+            if (dx == 0 && dy == 0)
+            {
+                _autoScrollTimer.Stop();
+                return;
+            }
+
+            if (dx != 0)
+            {
+                SetBarValue(hScrollBar, hScrollBar.Value + dx);
+            }
+            if (dy != 0)
+            {
+                ScrollBar bar = _splitView && y < UpperPaneHeight ? (ScrollBar)_vScrollBarUpper : vScrollBar;
+                SetBarValue(bar, bar.Value + dy);
+            }
+
+            // Re-evaluate the selection so the box keeps tracking the mouse while scrolling
+            _selectMode.MouseDrag(
+                (int)(x / _zoom) + _viewablePixels.X,
+                ScreenToVirtualY(y));
+            Redraw();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData) 
@@ -1221,11 +1299,6 @@ namespace DJMaxEditor
                 _documentContext.Clipboard.PasteAt(_documentContext.Model.VirtualCurrentTick);
                 return true;
             }
-            if (keyData == (Keys.Control | Keys.D))
-            {
-                _documentContext.Clipboard.DuplicateSelection(QuantizeVirtualStep);
-                return true;
-            }
 
             int multiplier = (keyData & Keys.Shift) == Keys.Shift ? 4 : 1;
             Keys keyCode = keyData & Keys.KeyCode;
@@ -1252,7 +1325,6 @@ namespace DJMaxEditor
         private void DrawingArea_Resize(object sender, EventArgs e)
         {
             UpdateScrollbars();
-            LayoutUpperHScrollBar();
             DrawingArea.Invalidate();
         }
 

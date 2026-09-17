@@ -55,7 +55,7 @@ namespace DJMaxEditor.Tests
                 using (var surface = new TimelineV2Control())
                 {
                     surface.Bind(new EditorDocumentContext(model, "respect.pt"));
-                    AssertTrue(surface.StatusText.Contains("RESPECT V"), "Respect V label is missing");
+                    AssertTrue(surface.StatusText.Contains("TECHNIKA Q"), "Technika Q label is missing");
                     AssertTrue(surface.StatusText.Contains("EDITABLE"), "editable label is missing");
                 }
             });
@@ -97,6 +97,55 @@ namespace DJMaxEditor.Tests
                 }
             });
 
+            Test("LegacyEditor_WheelZoomStepsAlwaysReachDefault", () =>
+            {
+                float zoom = EditorControl.MinZoom;
+                for (int i = 0; i < 100 && zoom < EditorControl.DefaultZoom; i++)
+                {
+                    zoom = EditorControl.NextZoomStep(zoom, 1);
+                }
+                AssertTrue(zoom == EditorControl.DefaultZoom,
+                    "stepping up from min zoom never lands exactly on the default zoom");
+
+                zoom = EditorControl.MaxZoom;
+                for (int i = 0; i < 100 && zoom > EditorControl.DefaultZoom; i++)
+                {
+                    zoom = EditorControl.NextZoomStep(zoom, -1);
+                }
+                AssertTrue(zoom == EditorControl.DefaultZoom,
+                    "stepping down from max zoom never lands exactly on the default zoom");
+
+                AssertTrue(EditorControl.NextZoomStep(EditorControl.MinZoom, -1) == EditorControl.MinZoom,
+                    "zoom step below the minimum was not clamped");
+                AssertTrue(EditorControl.NextZoomStep(EditorControl.MaxZoom, 1) == EditorControl.MaxZoom,
+                    "zoom step above the maximum was not clamped");
+            });
+
+            Test("EditorForm_ResetActiveZoomRestoresSurfaceDefaults", () =>
+            {
+                var model = SyntheticChartFactory.Create(1, 10, 100);
+                using (var legacyForm = new EditorForm(false))
+                {
+                    legacyForm.Bind(new EditorDocumentContext(model, "zoom.pt"));
+                    legacyForm.Editor.SetZoom(1.5f);
+                    legacyForm.ResetActiveZoom();
+                    AssertNear(1.0, legacyForm.ActiveZoomFactor, 0.0001,
+                        "reset did not restore the legacy default zoom");
+                }
+
+                using (var timelineForm = new EditorForm(true))
+                {
+                    timelineForm.Bind(new EditorDocumentContext(model, "zoom.pt"));
+                    AssertTrue(timelineForm.ActiveSurface.TrySetTimeZoom(0.5f),
+                        "setup zoom on the V2 surface failed");
+                    AssertNear(2.0, timelineForm.ActiveZoomFactor, 0.001,
+                        "V2 zoom factor did not track the raw time zoom");
+                    timelineForm.ResetActiveZoom();
+                    AssertNear(1.0, timelineForm.ActiveZoomFactor, 0.001,
+                        "reset did not restore the V2 default zoom");
+                }
+            });
+
             Test("EditorForm_FeatureFlagHostsEitherSurfaceWithLegacyFallback", () =>
             {
                 using (var legacyForm = new EditorForm(false))
@@ -122,8 +171,8 @@ namespace DJMaxEditor.Tests
                 using (var form = new EditorForm(true))
                 {
                     form.Bind(new EditorDocumentContext(model, "respect.pt"));
-                    AssertTrue(form.DocumentStatusText.Contains("RESPECT V"),
-                        "host status did not show Respect V");
+                    AssertTrue(form.DocumentStatusText.Contains("TECHNIKA Q"),
+                        "host status did not show Technika Q");
                     AssertTrue(form.DocumentStatusText.Contains("EDITABLE"),
                         "host status did not show editable state");
                 }
