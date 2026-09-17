@@ -1444,6 +1444,26 @@ namespace DJMaxEditor {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        public static System.Drawing.Bitmap zw_arrowdown_16 {
+            get {
+                object obj = ResourceManager.GetObject("zw_arrowdown_16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap zw_filter_16 {
+            get {
+                object obj = ResourceManager.GetObject("zw_filter_16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         public static System.Drawing.Bitmap zw_undo_16 {
             get {
                 object obj = ResourceManager.GetObject("zw_undo_16", resourceCulture);
@@ -1496,6 +1516,16 @@ namespace DJMaxEditor {
                 return ((System.Drawing.Bitmap)(obj));
             }
         }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_filter {
+            get {
+                object obj = ResourceManager.GetObject("wps_filter", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>

@@ -60,6 +60,12 @@ namespace DJMaxEditor
             this.allToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deselectToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.inverseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.boxSelectFilterSeparator = new System.Windows.Forms.ToolStripSeparator();
+            this.boxSelectFilterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.boxSelectFilterVolumeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.boxSelectFilterTempoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.boxSelectFilterBeatToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.boxSelectFilterVideoStartToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.optionsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.follwTrackPrgressToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.fullScreenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -224,7 +230,9 @@ namespace DJMaxEditor
             this.selectToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.allToolStripMenuItem,
             this.deselectToolStripMenuItem,
-            this.inverseToolStripMenuItem});
+            this.inverseToolStripMenuItem,
+            this.boxSelectFilterSeparator,
+            this.boxSelectFilterToolStripMenuItem});
             this.selectToolStripMenuItem.Name = "selectToolStripMenuItem";
             this.selectToolStripMenuItem.Size = new System.Drawing.Size(63, 26);
             this.selectToolStripMenuItem.Text = "Select";
@@ -254,6 +262,58 @@ namespace DJMaxEditor
             this.inverseToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.inverseToolStripMenuItem.Text = "Inverse";
             this.inverseToolStripMenuItem.Click += new System.EventHandler(this.inverseToolStripMenuItem_Click);
+            //
+            // boxSelectFilterSeparator
+            //
+            this.boxSelectFilterSeparator.Name = "boxSelectFilterSeparator";
+            this.boxSelectFilterSeparator.Size = new System.Drawing.Size(221, 6);
+            //
+            // boxSelectFilterToolStripMenuItem
+            //
+            this.boxSelectFilterToolStripMenuItem.CheckOnClick = true;
+            this.boxSelectFilterToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.boxSelectFilterVolumeToolStripMenuItem,
+            this.boxSelectFilterTempoToolStripMenuItem,
+            this.boxSelectFilterBeatToolStripMenuItem,
+            this.boxSelectFilterVideoStartToolStripMenuItem});
+            this.boxSelectFilterToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_filter;
+            this.boxSelectFilterToolStripMenuItem.Name = "boxSelectFilterToolStripMenuItem";
+            this.boxSelectFilterToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.boxSelectFilterToolStripMenuItem.Text = "Select Filter";
+            this.boxSelectFilterToolStripMenuItem.CheckedChanged += new System.EventHandler(this.boxSelectFilterToolStripMenuItem_CheckedChanged);
+            //
+            // boxSelectFilterVolumeToolStripMenuItem
+            //
+            this.boxSelectFilterVolumeToolStripMenuItem.Checked = true;
+            this.boxSelectFilterVolumeToolStripMenuItem.CheckOnClick = true;
+            this.boxSelectFilterVolumeToolStripMenuItem.Name = "boxSelectFilterVolumeToolStripMenuItem";
+            this.boxSelectFilterVolumeToolStripMenuItem.Size = new System.Drawing.Size(148, 26);
+            this.boxSelectFilterVolumeToolStripMenuItem.Text = "Volume";
+            this.boxSelectFilterVolumeToolStripMenuItem.Click += new System.EventHandler(this.boxSelectFilterKindToolStripMenuItem_Click);
+            //
+            // boxSelectFilterTempoToolStripMenuItem
+            //
+            this.boxSelectFilterTempoToolStripMenuItem.CheckOnClick = true;
+            this.boxSelectFilterTempoToolStripMenuItem.Name = "boxSelectFilterTempoToolStripMenuItem";
+            this.boxSelectFilterTempoToolStripMenuItem.Size = new System.Drawing.Size(148, 26);
+            this.boxSelectFilterTempoToolStripMenuItem.Text = "Tempo";
+            this.boxSelectFilterTempoToolStripMenuItem.Click += new System.EventHandler(this.boxSelectFilterKindToolStripMenuItem_Click);
+            //
+            // boxSelectFilterBeatToolStripMenuItem
+            //
+            this.boxSelectFilterBeatToolStripMenuItem.CheckOnClick = true;
+            this.boxSelectFilterBeatToolStripMenuItem.Name = "boxSelectFilterBeatToolStripMenuItem";
+            this.boxSelectFilterBeatToolStripMenuItem.Size = new System.Drawing.Size(148, 26);
+            this.boxSelectFilterBeatToolStripMenuItem.Text = "Beat";
+            this.boxSelectFilterBeatToolStripMenuItem.Click += new System.EventHandler(this.boxSelectFilterKindToolStripMenuItem_Click);
+            //
+            // boxSelectFilterVideoStartToolStripMenuItem
+            //
+            this.boxSelectFilterVideoStartToolStripMenuItem.CheckOnClick = true;
+            this.boxSelectFilterVideoStartToolStripMenuItem.Name = "boxSelectFilterVideoStartToolStripMenuItem";
+            this.boxSelectFilterVideoStartToolStripMenuItem.Size = new System.Drawing.Size(148, 26);
+            this.boxSelectFilterVideoStartToolStripMenuItem.Text = "VideoStart";
+            this.boxSelectFilterVideoStartToolStripMenuItem.Click += new System.EventHandler(this.boxSelectFilterKindToolStripMenuItem_Click);
             // 
             // optionsToolStripMenuItem
             // 
@@ -746,6 +806,12 @@ namespace DJMaxEditor
         private System.Windows.Forms.ToolStripMenuItem allToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem deselectToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem inverseToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator boxSelectFilterSeparator;
+        private System.Windows.Forms.ToolStripMenuItem boxSelectFilterToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem boxSelectFilterVolumeToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem boxSelectFilterTempoToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem boxSelectFilterBeatToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem boxSelectFilterVideoStartToolStripMenuItem;
         private System.Windows.Forms.ToolStripDropDownButton zoneRendererToolStripDropDownButton;
         private System.Windows.Forms.Timer PlayerTimer;
     }

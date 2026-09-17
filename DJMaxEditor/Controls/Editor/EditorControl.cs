@@ -134,6 +134,10 @@ namespace DJMaxEditor
             MouseWheel += DrawingArea_MouseWheel;
             DrawingArea.MouseWheel += DrawingArea_MouseWheel;
 
+            _autoScrollTimer = new Timer { Interval = 40 };
+            _autoScrollTimer.Tick += AutoScrollTimer_Tick;
+            Disposed += delegate { _autoScrollTimer.Dispose(); };
+
             SetStyle(ControlStyles.Selectable, true);
         }
 
@@ -524,6 +528,10 @@ namespace DJMaxEditor
         private bool _splitView;
 
         private bool _dragUpperPane;
+
+        private readonly Timer _autoScrollTimer;
+
+        private Point _autoScrollMouse;
 
         public bool SplitViewEnabled
         {
@@ -1125,6 +1133,10 @@ namespace DJMaxEditor
                 if (_selectMode != null)
                 {
                     _selectMode.MouseDrag(xx, yy);
+                    if (_selectMode.IsBoxSelecting)
+                    {
+                        UpdateBoxSelectAutoScroll(e.X, e.Y);
+                    }
                     shouldReDraw = true;
                 }
             }
@@ -1153,6 +1165,7 @@ namespace DJMaxEditor
         private void DrawingArea_MouseUp(object sender, MouseEventArgs e) 
         {
             _drag.Stop();
+            _autoScrollTimer.Stop();
 
             _selectMode?.MouseUp();
             _activeMoveUndoGroup = null;
@@ -1166,6 +1179,77 @@ namespace DJMaxEditor
             {
                 Redraw();
             }
+        }
+
+        /// <summary>
+        /// Auto scroll step in screen pixels for a mouse overshoot beyond the editor edge
+        /// </summary>
+        private static int AutoScrollStep(int overshoot)
+        {
+            return Math.Min(48, 8 + overshoot / 4);
+        }
+
+        /// <summary>
+        /// Track the box selection mouse position and toggle edge auto scrolling
+        /// </summary>
+        private void UpdateBoxSelectAutoScroll(int x, int y)
+        {
+            _autoScrollMouse = new Point(x, y);
+
+            bool outside = x < 0 || x > DrawingArea.Width || y < 0 || y > DrawingArea.Height;
+            if (outside)
+            {
+                if (!_autoScrollTimer.Enabled)
+                {
+                    _autoScrollTimer.Start();
+                }
+            }
+            else
+            {
+                _autoScrollTimer.Stop();
+            }
+        }
+
+        private void AutoScrollTimer_Tick(object sender, EventArgs e)
+        {
+            if (_selectMode == null || !_selectMode.IsBoxSelecting)
+            {
+                _autoScrollTimer.Stop();
+                return;
+            }
+
+            int x = _autoScrollMouse.X;
+            int y = _autoScrollMouse.Y;
+
+            int dx = 0;
+            if (x < 0) dx = -AutoScrollStep(-x);
+            else if (x > DrawingArea.Width) dx = AutoScrollStep(x - DrawingArea.Width);
+
+            int dy = 0;
+            if (y < 0) dy = -AutoScrollStep(-y);
+            else if (y > DrawingArea.Height) dy = AutoScrollStep(y - DrawingArea.Height);
+
+            if (dx == 0 && dy == 0)
+            {
+                _autoScrollTimer.Stop();
+                return;
+            }
+
+            if (dx != 0)
+            {
+                SetBarValue(hScrollBar, hScrollBar.Value + dx);
+            }
+            if (dy != 0)
+            {
+                ScrollBar bar = _splitView && y < UpperPaneHeight ? (ScrollBar)_vScrollBarUpper : vScrollBar;
+                SetBarValue(bar, bar.Value + dy);
+            }
+
+            // Re-evaluate the selection so the box keeps tracking the mouse while scrolling
+            _selectMode.MouseDrag(
+                (int)(x / _zoom) + _viewablePixels.X,
+                ScreenToVirtualY(y));
+            Redraw();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData) 

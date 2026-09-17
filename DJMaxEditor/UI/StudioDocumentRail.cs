@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -24,6 +25,12 @@ namespace DJMaxEditor.UI
         private readonly Button _undoButton;
         private readonly Button _redoButton;
         private readonly Button _followButton;
+        private readonly Button _selectFilterButton;
+        private readonly Button _selectFilterMenuButton;
+        private readonly ContextMenuStrip _selectFilterMenu;
+        private readonly Image _selectFilterCheckIcon;
+        private readonly List<KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>> _selectFilterItems =
+            new List<KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>>();
         private readonly Button _zoomButton;
         private readonly ToolTip _toolTip;
 
@@ -45,6 +52,12 @@ namespace DJMaxEditor.UI
             _followButton = CreateIconButton(
                 StudioTheme.CreatePlayIcon(StudioDesignSystem.PulseCyan),
                 "Follow Playback");
+            _selectFilterButton = CreateIconButton(ScaleIcon(Resources.zw_filter_16), "Select Filter");
+            _selectFilterMenuButton = CreateIconButton(ScaleIcon(Resources.zw_arrowdown_16), "Select Filter options");
+            _selectFilterMenuButton.Margin = new Padding(0, 3, 2, 3);
+            _selectFilterMenuButton.Width = 22;
+            _selectFilterCheckIcon = CreateCheckIcon();
+            _selectFilterMenu = BuildSelectFilterMenu();
             _zoomButton = StudioDesignSystem.CreateDeckButton("100%");
             _zoomButton.AutoSize = true;
             _zoomButton.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -61,6 +74,11 @@ namespace DJMaxEditor.UI
             _undoButton.Click += delegate { if (UndoRequested != null) UndoRequested(this, EventArgs.Empty); };
             _redoButton.Click += delegate { if (RedoRequested != null) RedoRequested(this, EventArgs.Empty); };
             _followButton.Click += delegate { if (FollowPlaybackRequested != null) FollowPlaybackRequested(this, EventArgs.Empty); };
+            _selectFilterButton.Click += delegate { if (SelectFilterToggleRequested != null) SelectFilterToggleRequested(this, EventArgs.Empty); };
+            _selectFilterMenuButton.Click += delegate
+            {
+                _selectFilterMenu.Show(_selectFilterMenuButton, new Point(0, _selectFilterMenuButton.Height));
+            };
 
             var toolbar = new FlowLayoutPanel
             {
@@ -71,7 +89,7 @@ namespace DJMaxEditor.UI
                 Height = 34,
                 Margin = Padding.Empty,
                 Padding = Padding.Empty,
-                Width = 300,
+                Width = 380,
                 WrapContents = false
             };
             toolbar.Controls.Add(_openButton);
@@ -80,6 +98,8 @@ namespace DJMaxEditor.UI
             toolbar.Controls.Add(_undoButton);
             toolbar.Controls.Add(_redoButton);
             toolbar.Controls.Add(_followButton);
+            toolbar.Controls.Add(_selectFilterButton);
+            toolbar.Controls.Add(_selectFilterMenuButton);
 
             _documentLabel = CreateLabel("NO DOCUMENT", 230, StudioDesignSystem.Frost);
             _documentLabel.AutoEllipsis = true;
@@ -136,6 +156,7 @@ namespace DJMaxEditor.UI
             SetDocumentState(false);
             SetEditState(false, false);
             SetFollowPlayback(false);
+            SetSelectFilter(false, EventSelectMode.SpecialEventKind.Volume);
             SetZoomPercent(100);
         }
 
@@ -150,7 +171,11 @@ namespace DJMaxEditor.UI
         public event EventHandler UndoRequested;
         public event EventHandler RedoRequested;
         public event EventHandler FollowPlaybackRequested;
+        public event EventHandler SelectFilterToggleRequested;
+        public event EventHandler SelectFilterKindRequested;
         public event EventHandler ZoomResetRequested;
+
+        internal EventSelectMode.SpecialEventKind SelectedFilterKind { get; private set; }
 
         public StudioWorkspacePreset[] WorkspacePresets
         {
@@ -218,6 +243,73 @@ namespace DJMaxEditor.UI
         public void SetFollowPlayback(bool following)
         {
             StyleSegment(_followButton, following);
+        }
+
+        internal void SetSelectFilter(bool enabled, EventSelectMode.SpecialEventKind kind)
+        {
+            SelectedFilterKind = kind;
+            StyleSegment(_selectFilterButton, enabled);
+            foreach (var pair in _selectFilterItems)
+            {
+                pair.Key.Image = pair.Value == kind ? _selectFilterCheckIcon : null;
+            }
+            _toolTip.SetToolTip(
+                _selectFilterButton,
+                enabled ? "Select Filter: " + kind.ToString().ToUpperInvariant() : "Select Filter");
+        }
+
+        private ContextMenuStrip BuildSelectFilterMenu()
+        {
+            var menu = new ContextMenuStrip
+            {
+                BackColor = StudioDesignSystem.Deck,
+                Font = StudioDesignSystem.BodyFont(9f),
+                ForeColor = StudioDesignSystem.Frost,
+                ShowImageMargin = true
+            };
+            menu.Renderer = new StudioToolStripRenderer(false);
+            AddSelectFilterItem(menu, "VOLUME", EventSelectMode.SpecialEventKind.Volume);
+            AddSelectFilterItem(menu, "TEMPO", EventSelectMode.SpecialEventKind.Tempo);
+            AddSelectFilterItem(menu, "BEAT", EventSelectMode.SpecialEventKind.Beat);
+            AddSelectFilterItem(menu, "VIDEOSTART", EventSelectMode.SpecialEventKind.VideoStart);
+            return menu;
+        }
+
+        private void AddSelectFilterItem(
+            ContextMenuStrip menu,
+            string label,
+            EventSelectMode.SpecialEventKind kind)
+        {
+            var item = new ToolStripMenuItem(label)
+            {
+                BackColor = StudioDesignSystem.Deck,
+                ForeColor = StudioDesignSystem.Frost
+            };
+            item.Click += delegate
+            {
+                SelectedFilterKind = kind;
+                if (SelectFilterKindRequested != null) SelectFilterKindRequested(this, EventArgs.Empty);
+            };
+            _selectFilterItems.Add(
+                new KeyValuePair<ToolStripMenuItem, EventSelectMode.SpecialEventKind>(item, kind));
+            menu.Items.Add(item);
+        }
+
+        private static Image CreateCheckIcon()
+        {
+            var bitmap = new Bitmap(16, 16);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            using (var pen = new Pen(StudioDesignSystem.PulseCyan, 2f))
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.DrawLines(pen, new[]
+                {
+                    new Point(3, 8),
+                    new Point(7, 12),
+                    new Point(13, 4)
+                });
+            }
+            return bitmap;
         }
 
         public void SetZoomPercent(int percent)

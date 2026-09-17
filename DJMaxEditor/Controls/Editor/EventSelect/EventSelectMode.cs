@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -41,6 +41,14 @@ namespace DJMaxEditor
         public IList<EventData> SelectedItems
         {
             get { return m_selectedObjects.AsReadOnly(); }
+        }
+
+        /// <summary>
+        /// True while a box selection drag is in progress
+        /// </summary>
+        public bool IsBoxSelecting
+        {
+            get { return m_drag.Active && m_selectMode; }
         }
 
         public void Dispose()
@@ -115,6 +123,11 @@ namespace DJMaxEditor
 
         public bool ToggleSelectionAtPos(int x1, int y1, int x2, int y2, bool singleFile = false, bool tootle = false)
         {
+            return ToggleSelectionAtPos(x1, y1, x2, y2, singleFile, tootle, null);
+        }
+
+        private bool ToggleSelectionAtPos(int x1, int y1, int x2, int y2, bool singleFile, bool tootle, SpecialEventKind? selectionFilter)
+        {
             if (false == tootle)
             {
                 m_selectedObjects.Clear();
@@ -139,7 +152,7 @@ namespace DJMaxEditor
             bool didSelect = false;
             foreach (EventData o in m_playerData.Tracks.Events)
             {
-                bool res = selectIfInside(o, r);
+                bool res = selectIfInside(o, r, selectionFilter);
                 didSelect |= res;
                 if (singleFile && res)
                 {
@@ -322,6 +335,16 @@ namespace DJMaxEditor
         /// </summary>
         private List<EventData> m_selectedObjects = new List<EventData>();
 
+        /// <summary>
+        /// Global switch restricting box selection to a single special event kind
+        /// </summary>
+        public static bool BoxSelectionFilterEnabled { get; set; }
+
+        /// <summary>
+        /// Special event kind picked while the box selection filter is on (Volume by default)
+        /// </summary>
+        public static SpecialEventKind BoxSelectionFilterKind { get; set; } = SpecialEventKind.Volume;
+
         private Brush tbrush = new SolidBrush(Color.FromArgb(62, StudioDesignSystem.PulseCyan));
 
         private Pen selection_border = new Pen(StudioDesignSystem.PulseCyan, 2f);
@@ -365,9 +388,54 @@ namespace DJMaxEditor
             return true;
         }
 
-        private bool selectIfInside(EventData it, Rectangle r)
+        /// <summary>
+        /// Special event kinds that can restrict box selection to a single kind
+        /// </summary>
+        internal enum SpecialEventKind
+        {
+            Volume,
+            Tempo,
+            Beat,
+            VideoStart
+        }
+
+        /// <summary>
+        /// Return the special kind of an event, or null for regular notes/events
+        /// </summary>
+        private static SpecialEventKind? GetSpecialEventKind(EventData eventData)
+        {
+            if (eventData == null)
+            {
+                return null;
+            }
+
+            switch (eventData.EventType)
+            {
+                case EventType.Volume:
+                    return SpecialEventKind.Volume;
+                case EventType.Tempo:
+                    return SpecialEventKind.Tempo;
+                case EventType.Beat:
+                    return SpecialEventKind.Beat;
+                case EventType.Note:
+                    if (eventData.Attribute == (byte)EventAttribute.VideoStart)
+                    {
+                        return SpecialEventKind.VideoStart;
+                    }
+                    break;
+            }
+
+            return null;
+        }
+
+        private bool selectIfInside(EventData it, Rectangle r, SpecialEventKind? selectionFilter)
         {
             if (it == null)
+            {
+                return false;
+            }
+
+            if (selectionFilter.HasValue && GetSpecialEventKind(it) != selectionFilter.Value)
             {
                 return false;
             }
@@ -448,7 +516,8 @@ namespace DJMaxEditor
         /// <param name="y2"></param>
         private void DoSelection(int x1, int x2, int y1, int y2)
         {
-            ToggleSelectionAtPos(x1, y1, x2, y2);
+            SpecialEventKind? filter = BoxSelectionFilterEnabled ? BoxSelectionFilterKind : (SpecialEventKind?)null;
+            ToggleSelectionAtPos(x1, y1, x2, y2, false, false, filter);
         }
     }
 }

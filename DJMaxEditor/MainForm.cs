@@ -393,6 +393,14 @@ namespace DJMaxEditor
             {
                 SetFollowPlayback(!m_editorForm.Editor.FollowTracksProgressWhilePlaying);
             };
+            m_documentRail.SelectFilterToggleRequested += delegate
+            {
+                SetSelectFilter(!EventSelectMode.BoxSelectionFilterEnabled);
+            };
+            m_documentRail.SelectFilterKindRequested += delegate
+            {
+                SetSelectFilterKind(m_documentRail.SelectedFilterKind);
+            };
             m_documentRail.ZoomResetRequested += delegate { m_editorForm.ResetActiveZoom(); };
             resetZoomToolStripMenuItem.ShortcutKeys = Keys.Control | Keys.D0;
 
@@ -460,6 +468,7 @@ namespace DJMaxEditor
             StudioTheme.ApplyToForm(m_preview);
             SetFollowPlayback(m_editorForm.Editor.FollowTracksProgressWhilePlaying);
             SetSplitView(_splitViewEnabled);
+            SyncSelectFilterUi();
             UpdateStudioRails();
         }
 
@@ -2791,6 +2800,65 @@ namespace DJMaxEditor
         private void inverseToolStripMenuItem_Click(object sender, EventArgs e)
         {
             m_editorForm.InverseSelection();
+        }
+
+        private void boxSelectFilterToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            SetSelectFilter(boxSelectFilterToolStripMenuItem.Checked);
+        }
+
+        private void boxSelectFilterKindToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (sender == boxSelectFilterVolumeToolStripMenuItem)
+            {
+                SetSelectFilterKind(EventSelectMode.SpecialEventKind.Volume);
+            }
+            else if (sender == boxSelectFilterTempoToolStripMenuItem)
+            {
+                SetSelectFilterKind(EventSelectMode.SpecialEventKind.Tempo);
+            }
+            else if (sender == boxSelectFilterBeatToolStripMenuItem)
+            {
+                SetSelectFilterKind(EventSelectMode.SpecialEventKind.Beat);
+            }
+            else if (sender == boxSelectFilterVideoStartToolStripMenuItem)
+            {
+                SetSelectFilterKind(EventSelectMode.SpecialEventKind.VideoStart);
+            }
+        }
+
+        private void SetSelectFilter(bool enabled)
+        {
+            EventSelectMode.BoxSelectionFilterEnabled = enabled;
+            SyncSelectFilterUi();
+            SetStudioStatus(enabled
+                ? "SELECT FILTER  " + EventSelectMode.BoxSelectionFilterKind.ToString().ToUpperInvariant()
+                : "SELECT FILTER  OFF");
+        }
+
+        private void SetSelectFilterKind(EventSelectMode.SpecialEventKind kind)
+        {
+            EventSelectMode.BoxSelectionFilterKind = kind;
+            // Picking a kind also turns the filter on.
+            EventSelectMode.BoxSelectionFilterEnabled = true;
+            SyncSelectFilterUi();
+            SetStudioStatus("SELECT FILTER  " + kind.ToString().ToUpperInvariant());
+        }
+
+        private void SyncSelectFilterUi()
+        {
+            boxSelectFilterToolStripMenuItem.Checked = EventSelectMode.BoxSelectionFilterEnabled;
+            boxSelectFilterVolumeToolStripMenuItem.Checked =
+                EventSelectMode.BoxSelectionFilterKind == EventSelectMode.SpecialEventKind.Volume;
+            boxSelectFilterTempoToolStripMenuItem.Checked =
+                EventSelectMode.BoxSelectionFilterKind == EventSelectMode.SpecialEventKind.Tempo;
+            boxSelectFilterBeatToolStripMenuItem.Checked =
+                EventSelectMode.BoxSelectionFilterKind == EventSelectMode.SpecialEventKind.Beat;
+            boxSelectFilterVideoStartToolStripMenuItem.Checked =
+                EventSelectMode.BoxSelectionFilterKind == EventSelectMode.SpecialEventKind.VideoStart;
+            m_documentRail.SetSelectFilter(
+                EventSelectMode.BoxSelectionFilterEnabled,
+                EventSelectMode.BoxSelectionFilterKind);
         }
 
         private void zoneRendererToolStripDropDownButton_DropDownItemClicked(object sender, ToolStripItemClickedEventArgs e)

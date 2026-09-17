@@ -547,6 +547,12 @@
   <data name="note" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Resources\note.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="zw_arrowdown_16" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\zw_arrowdown_16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="zw_filter_16" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\zw_filter_16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="zw_open_16" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Resources\zw_open_16.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
@@ -573,6 +579,9 @@
   </data>
   <data name="wps_exit" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Resources\wps_exit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="wps_filter" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\wps_filter.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="wps_follow" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Resources\wps_follow.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
