@@ -150,7 +150,7 @@
     <Compile Include="Editor\LegacyEditorSurfaceAdapter.cs" />
     <Compile Include="FeatureFlags.cs" />
     <Compile Include="Preview\GameplayPreviewControl.cs">
-      <SubType>UserControl</SubType>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="Preview\GameplayPreviewForm.cs">
       <SubType>Form</SubType>
@@ -206,7 +206,9 @@
     <Compile Include="Controls\Editor\RenderTimer.cs" />
     <Compile Include="Files\tech\TechmaniaChartSerializer.cs" />
     <Compile Include="Files\tech\TechmaniaChartWriter.cs" />
-    <Compile Include="Files\tech\TechPatternPickerForm.cs" />
+    <Compile Include="Files\tech\TechPatternPickerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Files\tech\TechOpenFile.cs" />
     <Compile Include="Files\tech\TechSaveFile.cs" />
     <Compile Include="Files\bms\BMESaveFile.cs" />
