@@ -339,6 +339,7 @@ namespace DJMaxEditor.Tests
             RunGameplayPreviewTests();
             RunStudioThemeTests();
             RunStudioShellFoundationTests();
+            RunSoundNoteSearchTests();
             if (!string.IsNullOrEmpty(timelineSnapshots))
             {
                 ExportTimelineSnapshots(fixtures, timelineSnapshots);

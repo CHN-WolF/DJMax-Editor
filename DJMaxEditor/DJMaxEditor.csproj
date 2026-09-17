@@ -432,6 +432,9 @@
     <Compile Include="libs\fmod\fmodex\fmod_errors.cs" />
     <Compile Include="libs\fmod\fmodex\fmod_memoryinfo.cs" />
     <Compile Include="Logs.cs" />
+    <Compile Include="FindSoundNotesForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="PlayerEventsListProxy.cs" />
     <Compile Include="PlayTickDialog.cs">
       <SubType>Form</SubType>

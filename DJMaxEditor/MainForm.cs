@@ -425,13 +425,13 @@ namespace DJMaxEditor
             toolStripButton1.AutoSize = false;
             toolStripButton1.Size = new System.Drawing.Size(38, 32);
             toolStripButton1.Margin = new Padding(0, 0, 3, 0);
-            toolStripButton1.Image = StudioTheme.CreatePlayIcon(StudioTheme.TimingCyan);
+            toolStripButton1.Image = Resources.wps_play;
             toolStripButton1.Text = "Play";
 
             toolStripButton2.AutoSize = false;
             toolStripButton2.Size = new System.Drawing.Size(38, 32);
             toolStripButton2.Margin = new Padding(0, 0, 8, 0);
-            toolStripButton2.Image = StudioTheme.CreateStopIcon(StudioTheme.MutedText);
+            toolStripButton2.Image = Resources.wps_stop;
             toolStripButton2.Text = "Stop";
 
             currentProgress.AutoSize = false;
@@ -913,6 +913,7 @@ namespace DJMaxEditor
         private StudioDocumentRail m_documentRail;
         private StudioStatusRail m_statusRail;
         private StudioCommandPaletteForm m_commandPalette;
+        private FindSoundNotesForm m_findNotesForm;
         private GameplayPreviewForm m_preview = new GameplayPreviewForm();
         private TableLayoutPanel m_studioTopHost;
 
@@ -2209,13 +2210,13 @@ namespace DJMaxEditor
                 if (m_isPaused || isStopped)
                 {
                     m_isPaused = true;
-                    toolStripButton1.Image = StudioTheme.CreatePlayIcon(StudioTheme.TimingCyan);
-                    playPauseToolStripMenuItem.Image = Resources.icon_play;
+                    toolStripButton1.Image = Resources.wps_play;
+                    playPauseToolStripMenuItem.Image = Resources.wps_play;
                 }
                 else
                 {
-                    toolStripButton1.Image = StudioTheme.CreatePauseIcon(StudioTheme.TimingCyan);
-                    playPauseToolStripMenuItem.Image = Resources.icon_pause;
+                    toolStripButton1.Image = Resources.wps_pause;
+                    playPauseToolStripMenuItem.Image = Resources.wps_pause;
                 }
             }
         }
@@ -2364,6 +2365,11 @@ namespace DJMaxEditor
             m_editorForm.ResetActiveZoom();
         }
 
+        private void saveToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            SaveCurrentDocument();
+        }
+
         private void saveAsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             saveFileDialog1.Filter = _saveHandler.GetFilter();
@@ -2501,6 +2507,42 @@ namespace DJMaxEditor
             if (CanMutateThroughActiveSurface())
             {
                 m_editorForm.Editor.UndoManager.Redo();
+            }
+        }
+
+        private void findNotesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (_activeDocument == null)
+            {
+                return;
+            }
+
+            if (m_findNotesForm == null || m_findNotesForm.IsDisposed)
+            {
+                m_findNotesForm = new FindSoundNotesForm(
+                    () => _documentContext == null ? null : _documentContext.Model,
+                    () => _documentContext == null ? 0 : _documentContext.Model.VirtualCurrentTick,
+                    LocateNote);
+            }
+
+            m_findNotesForm.Show(this);
+            m_findNotesForm.WindowState = FormWindowState.Normal;
+            m_findNotesForm.Focus();
+        }
+
+        private void LocateNote(EventData eventData)
+        {
+            if (eventData == null || _documentContext == null)
+            {
+                return;
+            }
+
+            _documentContext.Selection.Replace(new[] { eventData });
+
+            var surface = m_editorForm == null ? null : m_editorForm.ActiveSurface;
+            if (surface != null)
+            {
+                surface.RevealPosition(eventData.VirtualTick, (int)eventData.TrackId);
             }
         }
 

@@ -1,4 +1,4 @@
-﻿namespace DJMaxEditor {
+namespace DJMaxEditor {
     partial class AudioListForm {
         /// <summary>
         /// Required designer variable.
@@ -94,7 +94,7 @@
             // toolStripButton1
             // 
             this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton1.Image = global::DJMaxEditor.Resources.icon_play;
+            this.toolStripButton1.Image = global::DJMaxEditor.Resources.wps_play;
             this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton1.Name = "toolStripButton1";
             this.toolStripButton1.Size = new System.Drawing.Size(23, 22);
@@ -104,7 +104,7 @@
             // toolStripButton2
             // 
             this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton2.Image = global::DJMaxEditor.Resources.icon_stop;
+            this.toolStripButton2.Image = global::DJMaxEditor.Resources.wps_stop;
             this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton2.Name = "toolStripButton2";
             this.toolStripButton2.Size = new System.Drawing.Size(23, 22);

@@ -205,6 +205,14 @@ namespace DJMaxEditor.Controls.TimelineV2
             };
         }
 
+        public void RevealPosition(int virtualTick, int trackIndex)
+        {
+            if (_viewport == null) return;
+
+            _viewport.OriginTick = virtualTick - (_viewport.VisibleTickCount / 2);
+            RequestRepaint();
+        }
+
         public void RestoreViewState(EditorViewState state)
         {
             if (state == null) return;

@@ -1035,6 +1035,16 @@ namespace DJMaxEditor {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
+        public static System.Drawing.Bitmap find {
+            get {
+                object obj = ResourceManager.GetObject("find", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
         public static System.Drawing.Bitmap fmod {
             get {
                 object obj = ResourceManager.GetObject("fmod", resourceCulture);
@@ -1447,6 +1457,204 @@ namespace DJMaxEditor {
         public static System.Drawing.Bitmap zw_redo_16 {
             get {
                 object obj = ResourceManager.GetObject("zw_redo_16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_about {
+            get {
+                object obj = ResourceManager.GetObject("wps_about", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_attribute {
+            get {
+                object obj = ResourceManager.GetObject("wps_attribute", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_events {
+            get {
+                object obj = ResourceManager.GetObject("wps_events", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_exit {
+            get {
+                object obj = ResourceManager.GetObject("wps_exit", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_follow {
+            get {
+                object obj = ResourceManager.GetObject("wps_follow", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_info {
+            get {
+                object obj = ResourceManager.GetObject("wps_info", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_musicnote {
+            get {
+                object obj = ResourceManager.GetObject("wps_musicnote", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_open {
+            get {
+                object obj = ResourceManager.GetObject("wps_open", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_pause {
+            get {
+                object obj = ResourceManager.GetObject("wps_pause", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_play {
+            get {
+                object obj = ResourceManager.GetObject("wps_play", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_properties {
+            get {
+                object obj = ResourceManager.GetObject("wps_properties", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_quantize {
+            get {
+                object obj = ResourceManager.GetObject("wps_quantize", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_redo {
+            get {
+                object obj = ResourceManager.GetObject("wps_redo", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_save {
+            get {
+                object obj = ResourceManager.GetObject("wps_save", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_saveas {
+            get {
+                object obj = ResourceManager.GetObject("wps_saveas", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_selectall {
+            get {
+                object obj = ResourceManager.GetObject("wps_selectall", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_sound {
+            get {
+                object obj = ResourceManager.GetObject("wps_sound", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_stop {
+            get {
+                object obj = ResourceManager.GetObject("wps_stop", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_theme_events {
+            get {
+                object obj = ResourceManager.GetObject("wps_theme_events", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_theme_zones {
+            get {
+                object obj = ResourceManager.GetObject("wps_theme_zones", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_undo {
+            get {
+                object obj = ResourceManager.GetObject("wps_undo", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }        
+        /// <summary>
+        ///   查找 System.Drawing.Bitmap 类型的本地化资源。
+        /// </summary>
+        public static System.Drawing.Bitmap wps_zoom {
+            get {
+                object obj = ResourceManager.GetObject("wps_zoom", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

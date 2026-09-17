@@ -55,6 +55,7 @@ namespace DJMaxEditor
             this.editToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.undoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.redoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.findNotesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.selectToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.allToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deselectToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -144,7 +145,7 @@ namespace DJMaxEditor
             // 
             // openToolStripMenuItem
             // 
-            this.openToolStripMenuItem.Image = global::DJMaxEditor.Resources.Open_6529;
+            this.openToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_open;
             this.openToolStripMenuItem.Name = "openToolStripMenuItem";
             this.openToolStripMenuItem.ShortcutKeyDisplayString = "";
             this.openToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
@@ -154,16 +155,16 @@ namespace DJMaxEditor
             // 
             // saveToolStripMenuItem
             // 
-            this.saveToolStripMenuItem.Image = global::DJMaxEditor.Resources.save_16xLG;
+            this.saveToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_save;
             this.saveToolStripMenuItem.Name = "saveToolStripMenuItem";
             this.saveToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.S)));
             this.saveToolStripMenuItem.Size = new System.Drawing.Size(242, 26);
             this.saveToolStripMenuItem.Text = "Save";
-            this.saveToolStripMenuItem.Visible = false;
+            this.saveToolStripMenuItem.Click += new System.EventHandler(this.saveToolStripMenuItem_Click);
             // 
             // saveAsToolStripMenuItem
             // 
-            this.saveAsToolStripMenuItem.Image = global::DJMaxEditor.Resources.save_16xLG;
+            this.saveAsToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_saveas;
             this.saveAsToolStripMenuItem.Name = "saveAsToolStripMenuItem";
             this.saveAsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
             | System.Windows.Forms.Keys.S)));
@@ -173,6 +174,7 @@ namespace DJMaxEditor
             // 
             // exitToolStripMenuItem
             // 
+            this.exitToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_exit;
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             this.exitToolStripMenuItem.Size = new System.Drawing.Size(242, 26);
             this.exitToolStripMenuItem.Text = "Exit";
@@ -182,7 +184,8 @@ namespace DJMaxEditor
             // 
             this.editToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.undoToolStripMenuItem,
-            this.redoToolStripMenuItem});
+            this.redoToolStripMenuItem,
+            this.findNotesToolStripMenuItem});
             this.editToolStripMenuItem.Name = "editToolStripMenuItem";
             this.editToolStripMenuItem.Size = new System.Drawing.Size(49, 26);
             this.editToolStripMenuItem.Text = "Edit";
@@ -190,7 +193,7 @@ namespace DJMaxEditor
             // undoToolStripMenuItem
             // 
             this.undoToolStripMenuItem.Enabled = false;
-            this.undoToolStripMenuItem.Image = global::DJMaxEditor.Resources.Edit_UndoHS;
+            this.undoToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_undo;
             this.undoToolStripMenuItem.Name = "undoToolStripMenuItem";
             this.undoToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Z)));
             this.undoToolStripMenuItem.Size = new System.Drawing.Size(179, 26);
@@ -200,12 +203,21 @@ namespace DJMaxEditor
             // redoToolStripMenuItem
             // 
             this.redoToolStripMenuItem.Enabled = false;
-            this.redoToolStripMenuItem.Image = global::DJMaxEditor.Resources.Edit_RedoHS;
+            this.redoToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_redo;
             this.redoToolStripMenuItem.Name = "redoToolStripMenuItem";
             this.redoToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Y)));
             this.redoToolStripMenuItem.Size = new System.Drawing.Size(179, 26);
             this.redoToolStripMenuItem.Text = "Redo";
             this.redoToolStripMenuItem.Click += new System.EventHandler(this.redoToolStripMenuItem_Click);
+            // 
+            // findNotesToolStripMenuItem
+            // 
+            this.findNotesToolStripMenuItem.Image = global::DJMaxEditor.Resources.find;
+            this.findNotesToolStripMenuItem.Name = "findNotesToolStripMenuItem";
+            this.findNotesToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.F)));
+            this.findNotesToolStripMenuItem.Size = new System.Drawing.Size(260, 26);
+            this.findNotesToolStripMenuItem.Text = "Find Notes by Sound...";
+            this.findNotesToolStripMenuItem.Click += new System.EventHandler(this.findNotesToolStripMenuItem_Click);
             // 
             // selectToolStripMenuItem
             // 
@@ -219,6 +231,7 @@ namespace DJMaxEditor
             // 
             // allToolStripMenuItem
             // 
+            this.allToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_selectall;
             this.allToolStripMenuItem.Name = "allToolStripMenuItem";
             this.allToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.A)));
             this.allToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
@@ -253,6 +266,7 @@ namespace DJMaxEditor
             // 
             // follwTrackPrgressToolStripMenuItem
             // 
+            this.follwTrackPrgressToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_follow;
             this.follwTrackPrgressToolStripMenuItem.Name = "follwTrackPrgressToolStripMenuItem";
             this.follwTrackPrgressToolStripMenuItem.Size = new System.Drawing.Size(228, 26);
             this.follwTrackPrgressToolStripMenuItem.Text = "Follow while playing";
@@ -263,7 +277,7 @@ namespace DJMaxEditor
             // 
             this.fullScreenToolStripMenuItem.Enabled = false;
             this.fullScreenToolStripMenuItem.Name = "fullScreenToolStripMenuItem";
-            this.fullScreenToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.F)));
+            this.fullScreenToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.None;
             this.fullScreenToolStripMenuItem.Size = new System.Drawing.Size(228, 26);
             this.fullScreenToolStripMenuItem.Text = "FullScreen";
             this.fullScreenToolStripMenuItem.Visible = false;
@@ -280,7 +294,7 @@ namespace DJMaxEditor
             // 
             // playPauseToolStripMenuItem
             // 
-            this.playPauseToolStripMenuItem.Image = global::DJMaxEditor.Resources.icon_play;
+            this.playPauseToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_play;
             this.playPauseToolStripMenuItem.Name = "playPauseToolStripMenuItem";
             this.playPauseToolStripMenuItem.ShortcutKeyDisplayString = "Space";
             this.playPauseToolStripMenuItem.Size = new System.Drawing.Size(244, 26);
@@ -289,7 +303,7 @@ namespace DJMaxEditor
             // 
             // stopToolStripMenuItem
             // 
-            this.stopToolStripMenuItem.Image = global::DJMaxEditor.Resources.icon_stop;
+            this.stopToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_stop;
             this.stopToolStripMenuItem.Name = "stopToolStripMenuItem";
             this.stopToolStripMenuItem.Size = new System.Drawing.Size(244, 26);
             this.stopToolStripMenuItem.Text = "Stop";
@@ -305,6 +319,7 @@ namespace DJMaxEditor
             // 
             // resetZoomToolStripMenuItem
             // 
+            this.resetZoomToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_zoom;
             this.resetZoomToolStripMenuItem.Name = "resetZoomToolStripMenuItem";
             this.resetZoomToolStripMenuItem.Size = new System.Drawing.Size(170, 26);
             this.resetZoomToolStripMenuItem.Text = "Reset zoom";
@@ -365,6 +380,7 @@ namespace DJMaxEditor
             // 
             // eventsToolStripMenuItem
             // 
+            this.eventsToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_events;
             this.eventsToolStripMenuItem.Name = "eventsToolStripMenuItem";
             this.eventsToolStripMenuItem.Size = new System.Drawing.Size(222, 26);
             this.eventsToolStripMenuItem.Text = "Events";
@@ -380,6 +396,7 @@ namespace DJMaxEditor
             // 
             // aboutToolStripMenuItem
             // 
+            this.aboutToolStripMenuItem.Image = global::DJMaxEditor.Resources.wps_about;
             this.aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
             this.aboutToolStripMenuItem.Size = new System.Drawing.Size(133, 26);
             this.aboutToolStripMenuItem.Text = "About";
@@ -411,7 +428,7 @@ namespace DJMaxEditor
             // toolStripButton1
             // 
             this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton1.Image = global::DJMaxEditor.Resources.icon_play;
+            this.toolStripButton1.Image = global::DJMaxEditor.Resources.wps_play;
             this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton1.Name = "toolStripButton1";
             this.toolStripButton1.Size = new System.Drawing.Size(29, 28);
@@ -422,7 +439,7 @@ namespace DJMaxEditor
             // toolStripButton2
             // 
             this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton2.Image = global::DJMaxEditor.Resources.icon_stop;
+            this.toolStripButton2.Image = global::DJMaxEditor.Resources.wps_stop;
             this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripButton2.Name = "toolStripButton2";
             this.toolStripButton2.Size = new System.Drawing.Size(29, 28);
@@ -459,7 +476,7 @@ namespace DJMaxEditor
             this.toolStripMenuItem8,
             this.toolStripMenuItem9,
             this.toolStripMenuItem10});
-            this.toolStripDropDownButton1.Image = ((System.Drawing.Image)(resources.GetObject("toolStripDropDownButton1.Image")));
+            this.toolStripDropDownButton1.Image = global::DJMaxEditor.Resources.wps_quantize;
             this.toolStripDropDownButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.toolStripDropDownButton1.Name = "toolStripDropDownButton1";
             this.toolStripDropDownButton1.Size = new System.Drawing.Size(102, 28);
@@ -523,11 +540,11 @@ namespace DJMaxEditor
             // 
             // ThemeDropDownButton
             // 
-            this.ThemeDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.ThemeDropDownButton.Image = ((System.Drawing.Image)(resources.GetObject("ThemeDropDownButton.Image")));
+            this.ThemeDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.ThemeDropDownButton.Image = global::DJMaxEditor.Resources.wps_theme_events;
             this.ThemeDropDownButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.ThemeDropDownButton.Name = "ThemeDropDownButton";
-            this.ThemeDropDownButton.Size = new System.Drawing.Size(111, 28);
+            this.ThemeDropDownButton.Size = new System.Drawing.Size(135, 28);
             this.ThemeDropDownButton.Text = "Events theme";
             this.ThemeDropDownButton.DropDownItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.ThemeDropDownButton_DropDownItemClicked);
             // 
@@ -559,22 +576,22 @@ namespace DJMaxEditor
             // 
             // zoneRendererToolStripDropDownButton
             // 
-            this.zoneRendererToolStripDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.zoneRendererToolStripDropDownButton.Image = ((System.Drawing.Image)(resources.GetObject("zoneRendererToolStripDropDownButton.Image")));
+            this.zoneRendererToolStripDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.zoneRendererToolStripDropDownButton.Image = global::DJMaxEditor.Resources.wps_theme_zones;
             this.zoneRendererToolStripDropDownButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.zoneRendererToolStripDropDownButton.Name = "zoneRendererToolStripDropDownButton";
-            this.zoneRendererToolStripDropDownButton.Size = new System.Drawing.Size(109, 28);
+            this.zoneRendererToolStripDropDownButton.Size = new System.Drawing.Size(135, 28);
             this.zoneRendererToolStripDropDownButton.Text = "Zones theme";
             this.zoneRendererToolStripDropDownButton.ToolTipText = "Zones theme";
             this.zoneRendererToolStripDropDownButton.DropDownItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.zoneRendererToolStripDropDownButton_DropDownItemClicked);
             // 
             // eventDisplayModeToolStripDropDownButton
             // 
-            this.eventDisplayModeToolStripDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.eventDisplayModeToolStripDropDownButton.Image = ((System.Drawing.Image)(resources.GetObject("eventDisplayModeToolStripDropDownButton.Image")));
+            this.eventDisplayModeToolStripDropDownButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.ImageAndText;
+            this.eventDisplayModeToolStripDropDownButton.Image = global::DJMaxEditor.Resources.wps_attribute;
             this.eventDisplayModeToolStripDropDownButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.eventDisplayModeToolStripDropDownButton.Name = "eventDisplayModeToolStripDropDownButton";
-            this.eventDisplayModeToolStripDropDownButton.Size = new System.Drawing.Size(82, 28);
+            this.eventDisplayModeToolStripDropDownButton.Size = new System.Drawing.Size(115, 28);
             this.eventDisplayModeToolStripDropDownButton.Text = "Attribute";
             this.eventDisplayModeToolStripDropDownButton.DropDownItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.eventDisplayModeToolStripDropDownButton_DropDownItemClicked);
             // 
@@ -704,6 +721,7 @@ namespace DJMaxEditor
         private System.Windows.Forms.ToolStripMenuItem editToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem undoToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem redoToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem findNotesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
         private System.Windows.Forms.ToolStripButton toolStripButton1;
         private System.Windows.Forms.ToolStripButton toolStripButton2;

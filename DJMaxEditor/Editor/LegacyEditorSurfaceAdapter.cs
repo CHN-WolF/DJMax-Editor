@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using DJMaxEditor.Controls.Editor.Renderers;
 
 namespace DJMaxEditor.Editor
 {
@@ -58,6 +59,18 @@ namespace DJMaxEditor.Editor
 
         public void InvalidateView()
         {
+            _editor.Redraw();
+        }
+
+        public void RevealPosition(int virtualTick, int trackIndex)
+        {
+            const int leftMargin = 150;
+            var pos = virtualTick > leftMargin ? virtualTick - leftMargin : virtualTick;
+            float zoom = _editor.GetZoom();
+            int laneHeight = EventsRenderer.VirtualTrackheight;
+            int laneTop = Math.Max(0, (trackIndex - 1) * laneHeight);
+            _editor.ScrollTo((int)(pos * zoom), (int)(laneTop * zoom));
+            _editor.UpdateScrollbars();
             _editor.Redraw();
         }
 
