@@ -78,7 +78,7 @@ namespace DJMaxEditor.Files.FormatDetection
             var hint = string.IsNullOrEmpty(extensionHint) ? "" : $"; extension '{extensionHint}'";
             return new FormatDetectionResult(ChartFormat.Unknown, DetectionConfidence.None,
                 false, false, $"first bytes {Hex(data, 0, 8)}{hint}",
-                "File does not match PTFF, encrypted Technika, Respect V trailer, classic BMS, TECHMANIA JSON, or XML.");
+                "File does not match PTFF, encrypted Technika, Technika Q trailer, classic BMS, TECHMANIA JSON, or XML.");
         }
 
         private static bool LooksLikeClassicBms(byte[] data, out string evidence)

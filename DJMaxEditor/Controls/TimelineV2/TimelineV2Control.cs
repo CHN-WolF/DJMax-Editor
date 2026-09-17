@@ -539,7 +539,9 @@ namespace DJMaxEditor.Controls.TimelineV2
         private static string BuildStatusText(EditorDocumentContext document)
         {
             string format = document.Capabilities.SourceFormat.HasValue
-                ? document.Capabilities.SourceFormat.Value.ToString()
+                ? (document.Capabilities.SourceFormat.Value == DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV
+                    ? "Technika Q"
+                    : document.Capabilities.SourceFormat.Value.ToString())
                 : "Unknown format";
             string encryption = document.Capabilities.IsEncrypted
                 ? " | ENCRYPTED SOURCE / DECRYPTED IN MEMORY"

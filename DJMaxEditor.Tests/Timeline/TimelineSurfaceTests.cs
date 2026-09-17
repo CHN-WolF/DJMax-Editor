@@ -55,7 +55,7 @@ namespace DJMaxEditor.Tests
                 using (var surface = new TimelineV2Control())
                 {
                     surface.Bind(new EditorDocumentContext(model, "respect.pt"));
-                    AssertTrue(surface.StatusText.Contains("RESPECT V"), "Respect V label is missing");
+                    AssertTrue(surface.StatusText.Contains("TECHNIKA Q"), "Technika Q label is missing");
                     AssertTrue(surface.StatusText.Contains("EDITABLE"), "editable label is missing");
                 }
             });
@@ -171,8 +171,8 @@ namespace DJMaxEditor.Tests
                 using (var form = new EditorForm(true))
                 {
                     form.Bind(new EditorDocumentContext(model, "respect.pt"));
-                    AssertTrue(form.DocumentStatusText.Contains("RESPECT V"),
-                        "host status did not show Respect V");
+                    AssertTrue(form.DocumentStatusText.Contains("TECHNIKA Q"),
+                        "host status did not show Technika Q");
                     AssertTrue(form.DocumentStatusText.Contains("EDITABLE"),
                         "host status did not show editable state");
                 }

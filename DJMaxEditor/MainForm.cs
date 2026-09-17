@@ -210,6 +210,8 @@ namespace DJMaxEditor
 
         public void NoteSelect_OnSelectData(EventData eventData)
         {
+            m_currentTemplateEvent = eventData;
+
             if (!CanMutateThroughActiveSurface())
             {
                 return;
@@ -855,7 +857,7 @@ namespace DJMaxEditor
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.PtffEncryptedTechnika:
                     return "TECHNIKA PTFF";
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV:
-                    return "RESPECT V";
+                    return "TECHNIKA Q";
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.CyclonXml:
                     return "CYCLON XML";
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.BmsClassic:
@@ -909,6 +911,7 @@ namespace DJMaxEditor
         //private PerformancesForm m_performances = new PerformancesForm();
         private FModForm m_fmod = new FModForm();
         private NoteSelectForm m_notes;
+        private EventData m_currentTemplateEvent;
         private SaveHandler _saveHandler;
         private LoadHandler _loadHandler;
         private ToolStripMenuItem m_timelineV2MenuItem;
@@ -1310,6 +1313,14 @@ namespace DJMaxEditor
             ApplyPreviewProfileFromEventTheme();
             SyncToolButtons(document.Context.Interaction.Tool);
 
+            // Re-apply the Notes panel template to the newly active editor so Ctrl+click
+            // note creation works right after a tab switch and uses the template currently
+            // picked in the Notes panel instead of the editor's stale one.
+            if (m_currentTemplateEvent != null)
+            {
+                NoteSelect_OnSelectData(m_currentTemplateEvent);
+            }
+
             string displayName = Path.GetFileName(document.Context.SourcePath);
             bool readOnly = model.IsReadOnly;
             this.Text = String.Format("{0} - {1}{2}", APP_NAME, displayName, readOnly ? "   [READ-ONLY]" : "");
@@ -1529,21 +1540,6 @@ namespace DJMaxEditor
                     ".\n\nSaving it back is disabled because lossless round-trip and in-game compatibility " +
                     "have not been verified for this format.",
                     "Read-only chart", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            // Respect V charts are editable in memory, but the legacy Respect/TQ writer is not
-            // lossless. Allow the supported conversion path without risking the source container.
-            if (model != null &&
-                model.SourceFormat == DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV &&
-                !(handler is BMESaveFile) &&
-                !(handler is BmsonSaveFile))
-            {
-                MessageBox.Show(
-                    "Respect V charts are editable, but saving back to the original PT/bytes container " +
-                    "is not verified.\n\nChoose Be-Music Script (*.bms) or Be-Music JSON (*.bmson) " +
-                    "in Save As to export your edits.",
-                    "Export Respect V chart", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -2018,7 +2014,7 @@ namespace DJMaxEditor
                 default:
                     title = "Unsupported chart format";
                     message =
-                        "The file does not match PTFF, encrypted Technika, Respect V trailer format, or a supported XML format. " +
+                        "The file does not match PTFF, encrypted Technika, Technika Q trailer format, or a supported XML format. " +
                         "No decryption or network request was attempted.";
                     break;
             }
