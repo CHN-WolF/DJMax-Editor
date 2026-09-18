@@ -16,7 +16,9 @@ namespace DJMaxEditor
 
         void PauseAllSounds();
 
-        bool PlaySound(uint channelIndex, uint soundIndex, float volume, byte pan, uint offset = 0);
+        // audition: play outside the transport channel group, so a keysound triggered
+        // from the audio list stays audible while chart playback is paused.
+        bool PlaySound(uint channelIndex, uint soundIndex, float volume, byte pan, uint offset = 0, bool audition = false);
 
         object GetDebugInfo();
 
