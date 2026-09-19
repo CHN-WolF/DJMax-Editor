@@ -14,7 +14,9 @@ namespace DJMaxEditor
         public AudioPlayerFmodEx()
         {
             m_updateTimer.Tick += UpdateTimer_Tick;
-            m_updateTimer.Interval = 1000;
+            // FMOD reclaims finished channels and manages virtual voices from update();
+            // calling it rarely lets dead channels fill the channel pool.
+            m_updateTimer.Interval = 10;
             m_updateTimer.Enabled = true;
             FMODEX.RESULT result = Initialize();
             ERRCHECK(result);
@@ -181,10 +183,18 @@ namespace DJMaxEditor
                 m_playbackGroup.stop();
                 m_playbackGroup.setPaused(false);
             }
+            // Auditioned sounds live outside the playback group; stop them explicitly.
+            foreach (FMODEX.Channel channel in _channels)
+            {
+                if (channel != null)
+                {
+                    channel.stop();
+                }
+            }
             Array.Clear(_channels, 0, _channels.Length);
         }
 
-        public bool PlaySound(uint channelIndex, uint soundIndex, float volume, byte pan, uint offset = 0)
+        public bool PlaySound(uint channelIndex, uint soundIndex, float volume, byte pan, uint offset = 0, bool audition = false)
         {
             channelIndex %= MAX_CHANNEL;
 
@@ -227,7 +237,9 @@ namespace DJMaxEditor
             if (result == FMODEX.RESULT.OK)
             {
                 chan = _channels[channelIndex];
-                if (m_playbackGroup != null)
+                // A paused group mutes its channels no matter the channel's own paused
+                // state, so auditioned sounds stay out of the transport group.
+                if (m_playbackGroup != null && !audition)
                 {
                     chan.setChannelGroup(m_playbackGroup);
                 }
@@ -359,7 +371,9 @@ namespace DJMaxEditor
 
             m_system.setSoftwareFormat(44100, FMODEX.SOUND_FORMAT.PCMFLOAT, 0, 0, FMODEX.DSP_RESAMPLER.LINEAR);
 
-            result = m_system.init(32, FMODEX.INITFLAGS.NORMAL, (IntPtr)null);
+            // Keysound-dense charts can keep dozens of samples sounding at once
+            // (long cymbal/song tails), so 32 voices is not enough.
+            result = m_system.init(256, FMODEX.INITFLAGS.NORMAL, (IntPtr)null);
             if (result != FMODEX.RESULT.OK)
             {
                 return result;

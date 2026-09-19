@@ -2594,7 +2594,7 @@ namespace DJMaxEditor
             }
 
             this.m_audioPlayer.StopSound(ReservedChannel);
-            this.m_audioPlayer.PlaySound(ReservedChannel, selection.InsNum, 1, 64);
+            this.m_audioPlayer.PlaySound(ReservedChannel, selection.InsNum, 1, 64, audition: true);
         }
 
         private void AudioList_onStopPressed(object sender)
