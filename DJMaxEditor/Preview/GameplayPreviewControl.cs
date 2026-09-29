@@ -116,6 +116,27 @@ namespace DJMaxEditor.Preview
             }
         }
 
+        /// <summary>The SPRITE SET choice when the caller already holds the resolved catalog
+        /// entry (startup selection, catalog rebuild). Skips the persisted-id re-probe the
+        /// setter above performs; sheets load lazily at the next paint.</summary>
+        internal void ApplySpriteStyle(TechnikaSpriteStyle style)
+        {
+            if (_technikaRenderer.SetSpriteStyle(style))
+            {
+                Invalidate();
+            }
+        }
+
+        /// <summary>The dropdown pick: the chosen set was decoded and pre-warmed on a loader
+        /// thread, so this is the cheap swap. A no-op when the id is unchanged.</summary>
+        internal void ApplySpriteStyle(TechnikaSpriteStyle style, TechnikaNoteSprites sprites)
+        {
+            if (_technikaRenderer.SetSpriteStyle(style, sprites))
+            {
+                Invalidate();
+            }
+        }
+
         /// <summary>The playback position the current frame was built at, or 0 before a
         /// document is bound. Surfaced in the header status line, which is where the
         /// floating overlay used to draw it.</summary>

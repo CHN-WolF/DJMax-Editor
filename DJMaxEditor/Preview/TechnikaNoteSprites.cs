@@ -798,6 +798,27 @@ namespace DJMaxEditor.Preview
             }
         }
 
+        /// <summary>Eagerly loads every sheet the renderer can ask for - every note kind, run
+        /// line, trail cap and body in both states, the approach ring and the hit-effect
+        /// sequence - so a style switch pays the decode once on a loader thread instead of
+        /// stalling the first paint. The caches above make the later real reads instant.</summary>
+        internal void Warm()
+        {
+            var kinds = (GameplayPreviewNoteKind[])Enum.GetValues(typeof(GameplayPreviewNoteKind));
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                For(kinds[i]);
+                Line(kinds[i]);
+                TrailCap(kinds[i], false);
+                TrailCap(kinds[i], true);
+                TrailBody(kinds[i], false);
+                TrailBody(kinds[i], true);
+            }
+            _ = Ring;
+            _ = CoolBomb;
+            _ = ReferenceFrameSize;
+        }
+
         public static TechnikaNoteSprites Load()
         {
             return new TechnikaNoteSprites(FindLocalRoot(), null, false);

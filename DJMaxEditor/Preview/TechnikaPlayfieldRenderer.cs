@@ -115,14 +115,22 @@ namespace DJMaxEditor.Preview
         /// </summary>
         public bool SetSpriteStyle(TechnikaSpriteStyle style)
         {
-            if (style == null ||
+            return SetSpriteStyle(style, TechnikaNoteSprites.ForStyle(style));
+        }
+
+        /// <summary>Installs an already-built (and pre-warmed) sprite set, e.g. one decoded on
+        /// a loader thread so the UI thread never pays the decode. The unchanged-id guard is
+        /// the same as the style-only overload: re-selecting the current set is a no-op.</summary>
+        public bool SetSpriteStyle(TechnikaSpriteStyle style, TechnikaNoteSprites sprites)
+        {
+            if (style == null || sprites == null ||
                 (_spriteStyleId != null &&
                     string.Equals(_spriteStyleId, style.Id, StringComparison.OrdinalIgnoreCase)))
             {
                 return false;
             }
             _spriteStyleId = style.Id;
-            _sprites = TechnikaNoteSprites.ForStyle(style);
+            _sprites = sprites;
             return true;
         }
 

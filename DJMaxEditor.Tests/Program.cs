@@ -387,6 +387,18 @@ namespace DJMaxEditor.Tests
             catch (Exception ex) { _fail++; Console.WriteLine($"[FAIL] {name}: {ex.Message}"); }
         }
 
+        // A Test that needs one fixture file on disk but loads it through its own code path
+        // (decrypt/parse/directory walk). Skips cleanly, like RealFileTest, when --fixtures
+        // was not given or the file is absent, so a data-less checkout reports SKIP instead
+        // of crashing inside Path.Combine.
+        private static void FixtureTest(string name, string fixturesDir, string relative, Action body)
+        {
+            if (fixturesDir == null) { _skip++; Console.WriteLine($"[SKIP] {name} (no --fixtures)"); return; }
+            var path = Path.Combine(fixturesDir, relative.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path)) { _skip++; Console.WriteLine($"[SKIP] {name} (missing {relative})"); return; }
+            Test(name, body);
+        }
+
         private static void RealFileTestTwo(string name, string fixturesDir, string relativeA,
             string relativeB, Action<byte[], byte[]> body)
         {

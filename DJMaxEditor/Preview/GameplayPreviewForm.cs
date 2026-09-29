@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Threading;
 using System.Windows.Forms;
 using DJMaxEditor.DJMax;
 using DJMaxEditor.Editor;
@@ -23,11 +24,11 @@ namespace DJMaxEditor.Preview
         private readonly GameplayPreviewControl _preview;
         private readonly Label _status;
         private readonly TrackBar _zoom;
-        private readonly ComboBox _scroll;
-        private readonly ComboBox _fader;
-        private readonly ComboBox _line;
-        private readonly ComboBox _speed;
-        private readonly ComboBox _spriteSet;
+        private readonly StudioDropdown _scroll;
+        private readonly StudioDropdown _fader;
+        private readonly StudioDropdown _line;
+        private readonly StudioDropdown _speed;
+        private readonly StudioDropdown _spriteSet;
         private readonly Button _browseSpriteRoot;
 
         /// <summary>The owner-picked manual speed, remembered across binds so a
@@ -44,6 +45,10 @@ namespace DJMaxEditor.Preview
         /// <summary>Guards the dropdown while it is being (re)filled, so programmatic index
         /// changes are not mistaken for the owner's choice and persisted.</summary>
         private bool _updatingSpriteSet;
+
+        /// <summary>Incremented on every sprite-set pick; a load that finishes with a stale
+        /// generation is dropped, so rapid picks never resurrect a superseded set.</summary>
+        private int _spriteStyleLoadGeneration;
         private const long PlaybackFrameIntervalMilliseconds = 15;
         private readonly Stopwatch _playbackClock = Stopwatch.StartNew();
         private long _lastPlaybackFrameMilliseconds = -PlaybackFrameIntervalMilliseconds;
@@ -413,13 +418,61 @@ namespace DJMaxEditor.Preview
             UpdateStatus();
         }
 
-        /// <summary>The dropdown changed because the owner picked a style: persist the id
-        /// and hand it to the preview, which resolves it against a fresh catalog.</summary>
+        /// <summary>The dropdown changed because the owner picked a style: persist the id,
+        /// decode the chosen set on a loader thread (the PNG sheets and the 23-frame hit
+        /// effect are far too heavy for the UI thread - decoding them inside the click
+        /// froze the whole window), then swap the warmed set in. A newer pick supersedes
+        /// an in-flight load; until it lands the previous set keeps drawing.</summary>
         private void ApplySpriteStyle(TechnikaSpriteStyle style)
         {
             FeatureFlags.SetPreviewSpriteStyleId(style.Id);
-            _preview.SpriteStyleId = style.Id;
-            UpdateStatus();
+
+            _status.Text = "LOADING  " + style.DisplayName.ToUpperInvariant();
+            _status.ForeColor = StudioDesignSystem.Muted;
+
+            int generation = ++_spriteStyleLoadGeneration;
+            var thread = new Thread(delegate ()
+            {
+                TechnikaNoteSprites sprites = null;
+                try
+                {
+                    sprites = TechnikaNoteSprites.ForStyle(style);
+                    sprites.Warm();
+                }
+                catch (Exception ex)
+                {
+                    DJMaxEditor.Diagnostics.DiagnosticLog.Exception("preview.spritestyle", ex);
+                }
+
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (IsDisposed || generation != _spriteStyleLoadGeneration)
+                        {
+                            return;
+                        }
+                        if (sprites != null)
+                        {
+                            _preview.ApplySpriteStyle(style, sprites);
+                        }
+                        else
+                        {
+                            // Decode failed even off the UI thread: fall back to the legacy
+                            // path (resolve + lazy load) rather than leaving the old set on.
+                            _preview.SpriteStyleId = style.Id;
+                        }
+                        UpdateStatus();
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The form went away between the load finishing and the marshalled swap.
+                }
+            });
+            thread.IsBackground = true;
+            thread.Name = "SpriteStyleLoad";
+            thread.Start();
         }
 
         /// <summary>Shows the folder picker for the Technika 3 data, stores the resolved
@@ -458,21 +511,19 @@ namespace DJMaxEditor.Preview
             _updatingSpriteSet = true;
             try
             {
-                _spriteSet.BeginUpdate();
                 _spriteSet.Items.Clear();
                 for (int i = 0; i < _spriteStyles.Count; i++)
                 {
                     _spriteSet.Items.Add(_spriteStyles[i].DisplayName);
                 }
                 _spriteSet.SelectedIndex = IndexOfSpriteStyle(resolved.Id);
-                _spriteSet.EndUpdate();
             }
             finally
             {
                 _updatingSpriteSet = false;
             }
 
-            _preview.SpriteStyleId = resolved.Id;
+            _preview.ApplySpriteStyle(resolved);
             UpdateStatus();
         }
 
@@ -495,7 +546,7 @@ namespace DJMaxEditor.Preview
             {
                 _updatingSpriteSet = false;
             }
-            _preview.SpriteStyleId = style.Id;
+            _preview.ApplySpriteStyle(style);
         }
 
         private int IndexOfSpriteStyle(string id)
@@ -589,15 +640,9 @@ namespace DJMaxEditor.Preview
             return unit;
         }
 
-        private static ComboBox BuildEffectorCombo(object[] items)
+        private static StudioDropdown BuildEffectorCombo(object[] items)
         {
-            var combo = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                FlatStyle = FlatStyle.Flat,
-                Font = StudioDesignSystem.UtilityFont(8f),
-                Size = new Size(126, 21)
-            };
+            var combo = new StudioDropdown();
             combo.Items.AddRange(items);
             combo.SelectedIndex = 0;
             return combo;

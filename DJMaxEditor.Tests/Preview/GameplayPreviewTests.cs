@@ -539,7 +539,7 @@ namespace DJMaxEditor.Tests
                         "_speed", BindingFlags.Instance | BindingFlags.NonPublic);
 
                     dock.Bind(new EditorDocumentContext(bytes, "speed.bytes"));
-                    var combo = (System.Windows.Forms.ComboBox)speedField.GetValue(dock);
+                    var combo = (DJMaxEditor.UI.StudioDropdown)speedField.GetValue(dock);
                     AssertTrue(!combo.Enabled, "BYTES must lock the speed combo");
                     AssertTrue(combo.SelectedIndex == 2, "BYTES attr 2 must select 2x");
 

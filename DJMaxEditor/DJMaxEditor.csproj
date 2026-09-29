@@ -189,6 +189,7 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="UI\StudioWorkspacePreset.cs" />
+    <Compile Include="UI\StudioDropdown.cs" />
     <Compile Include="UI\EmptyWorkspaceControl.cs">
       <SubType>UserControl</SubType>
     </Compile>

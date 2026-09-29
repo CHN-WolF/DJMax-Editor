@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.IO;
 using DJMaxEditor.Files;
@@ -64,7 +64,7 @@ namespace DJMaxEditor
                 WorkingDir = fi.DirectoryName;
                 Filename = fi.Name;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Logs.Write("Failed to get working folder");
                 return false;
@@ -170,7 +170,6 @@ namespace DJMaxEditor
                 {
                     Logs.Write("invalid Magic");
                     return false;
-                    break;
                 };
 
                 stream.Skip(0x02);

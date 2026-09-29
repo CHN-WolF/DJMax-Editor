@@ -1,4 +1,4 @@
-﻿using DJMaxEditor.DJMax;
+using DJMaxEditor.DJMax;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -112,7 +112,7 @@ namespace DJMaxEditor
                 return;
             }
 
-            DialogResult result = openFileDialog1.ShowDialog();
+            DialogResult result = openFileDialog1.ShowDialog(this);
             if (result == DialogResult.OK)
             {
                 OnInstrumentChanged.Invoke(this, currentSelection, openFileDialog1.FileName);

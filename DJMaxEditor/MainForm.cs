@@ -80,6 +80,7 @@ namespace DJMaxEditor
 
             return focused is TextBoxBase ||
                 focused is ComboBox ||
+                focused is StudioDropdown ||
                 focused is NumericUpDown ||
                 focused is DataGridView;
         }
@@ -1154,7 +1155,7 @@ namespace DJMaxEditor
             m_loadingForm.Close();
             if (false == success) 
             {
-                MessageBox.Show("Failed to load the file", "Load file error", MessageBoxButtons.OK, MessageBoxIcon.Error); 
+                MessageBox.Show(this, "Failed to load the file", "Load file error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -1507,7 +1508,7 @@ namespace DJMaxEditor
             if (handler is BMESaveFile &&
                 BmsonChartSerializer.ShouldUseForClassicBmsOverflow(model))
             {
-                MessageBox.Show(
+                MessageBox.Show(this,
                     "This chart needs " + BmsChartSerializer.CountRequiredKeysounds(model) +
                     " unique keysounds, but classic BMS only has 1,295 usable IDs.\n\n" +
                     "DJMax Editor will save it as BMSON instead. BMSON keeps every keysound and " +
@@ -1530,7 +1531,7 @@ namespace DJMaxEditor
 
             if (model != null && model.IsReadOnly)
             {
-                MessageBox.Show(
+                MessageBox.Show(this,
                     "This chart was opened read-only" +
                     (model.SourceFormat.HasValue ? " (" + model.SourceFormat + ")" : "") +
                     ".\n\nSaving it back is disabled because lossless round-trip and in-game compatibility " +
@@ -1571,7 +1572,7 @@ namespace DJMaxEditor
                     m_loadingForm.Close();
                     if (!ok)
                     {
-                        MessageBox.Show(
+                        MessageBox.Show(this,
                             "The file could not be saved. The target may be unchanged or incomplete; " +
                             "see the local diagnostics log.\n\nLog: " + DJMaxEditor.Diagnostics.DiagnosticLog.LogPath,
                             "Save failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1872,7 +1873,7 @@ namespace DJMaxEditor
             catch (Exception ex)
             {
                 DJMaxEditor.Diagnostics.DiagnosticLog.Exception("open.read", ex);
-                MessageBox.Show("The file could not be read.\n\n" + ex.Message,
+                MessageBox.Show(this, "The file could not be read.\n\n" + ex.Message,
                     "Load file error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
@@ -1941,7 +1942,7 @@ namespace DJMaxEditor
         {
             string name = Path.GetFileName(filename);
 
-            var choice = MessageBox.Show(
+            var choice = MessageBox.Show(this,
                 "This is an encrypted Technika/Trilogy chart.\n\n" +
                 "Decrypt it offline and open it? Decryption runs entirely on this machine " +
                 "(no upload, no network request). The original file is not modified.\n\n" +
@@ -1963,7 +1964,7 @@ namespace DJMaxEditor
             catch (Exception ex)
             {
                 DJMaxEditor.Diagnostics.DiagnosticLog.Exception("open.decrypt", ex);
-                MessageBox.Show(
+                MessageBox.Show(this,
                     "The chart could not be decrypted.\n\n" + ex.Message +
                     "\n\nFile: " + name + "\nThe file was not modified.",
                     "Decryption failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1977,7 +1978,7 @@ namespace DJMaxEditor
 
             if (reDetect.Format != DJMaxEditor.Files.FormatDetection.ChartFormat.PtffDecrypted)
             {
-                MessageBox.Show(
+                MessageBox.Show(this,
                     "Decryption did not produce a valid chart (no PTFF/EZTR structure was found). " +
                     "This file may use a different key or format.\n\n" +
                     "File: " + name +
@@ -2041,14 +2042,14 @@ namespace DJMaxEditor
             if (detection.FailureReason != null) message += "\nReason: " + detection.FailureReason;
             if (detection.Offset.HasValue) message += "\nOffset: 0x" + detection.Offset.Value.ToString("X");
 
-            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private void ShowChartLoadError(string filename, DJMaxEditor.Files.ChartLoadException ex)
         {
             m_loadingForm.Close();
             string offset = ex.Offset.HasValue ? "\nOffset: 0x" + ex.Offset.Value.ToString("X") : "";
-            MessageBox.Show(
+            MessageBox.Show(this,
                 "The chart could not be read: " + ex.Message +
                 "\n\nFile: " + filename + "\nError type: " + ex.Kind + offset +
                 "\n\nThe file was not modified.",
@@ -2058,7 +2059,7 @@ namespace DJMaxEditor
         private void ShowUnexpectedLoadError(string filename, Exception ex)
         {
             m_loadingForm.Close();
-            MessageBox.Show(
+            MessageBox.Show(this,
                 "An unexpected error occurred while loading the chart. It was logged locally.\n\n" +
                 ex.Message + "\n\nFile: " + filename + "\nLog: " + DJMaxEditor.Diagnostics.DiagnosticLog.LogPath,
                 "Load file error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -2122,6 +2123,9 @@ namespace DJMaxEditor
 
         private void OnExternalOpen(string[] paths)
         {
+            // Bring the editor up before any dialog is shown: the settings dialog and the
+            // loading form are modal, and a background process cannot pop them to the front.
+            ForceForeground();
             if (paths != null)
             {
                 foreach (var path in paths)
@@ -2133,7 +2137,6 @@ namespace DJMaxEditor
                     OpenFile(path);
                 }
             }
-            ForceForeground();
         }
 
         private void ForceForeground()
@@ -2299,7 +2302,7 @@ namespace DJMaxEditor
         {
             openFileDialog1.Filter = _loadHandler.GetFilter();
             openFileDialog1.Multiselect = true;
-            DialogResult result = openFileDialog1.ShowDialog();
+            DialogResult result = openFileDialog1.ShowDialog(this);
             if (result == DialogResult.OK)
             {
                 foreach (string name in openFileDialog1.FileNames)
@@ -2424,7 +2427,7 @@ namespace DJMaxEditor
                 saveFileDialog1.FileName = string.Empty;
             }
 
-            if (saveFileDialog1.ShowDialog() != DialogResult.OK)
+            if (saveFileDialog1.ShowDialog(this) != DialogResult.OK)
             {
                 return;
             }
