@@ -6,6 +6,8 @@ using System.Windows.Forms;
 using System.IO;
 using WeifenLuo.WinFormsUI.Docking;
 using System.Threading;
+using System.Diagnostics;
+using System.Globalization;
 using DJMaxEditor.Undo.Action;
 using DJMaxEditor.PropertyLayer;
 using DJMaxEditor.Controls.Editor.Renderers.Events;
@@ -378,6 +380,7 @@ namespace DJMaxEditor
 
             m_documentRail = new StudioDocumentRail();
             m_statusRail = new StudioStatusRail();
+            m_statusRail.SetPerformance("idle");
             m_documentRail.TimelineV1Requested += delegate { SetTimelineSurface(false); };
             m_documentRail.TimelineV2Requested += delegate { SetTimelineSurface(true); };
             m_documentRail.PreviewRequested += delegate { ShowGameplayPreview(); };
@@ -660,32 +663,12 @@ namespace DJMaxEditor
                 m_preview = new GameplayPreviewForm();
                 StudioTheme.ApplyToForm(m_preview);
                 m_preview.Bind(_documentContext);
-                ApplyPreviewProfileFromEventTheme();
             }
 
             m_preview.Show(dockPanel);
             m_preview.Activate();
             m_preview.RefreshPlaybackImmediately();
             SetStudioStatus("GAMEPLAY PREVIEW  •  VIEW ONLY");
-        }
-
-        private void ApplyPreviewProfileFromEventTheme()
-        {
-            if (m_preview == null || m_preview.IsDisposed || _documentContext == null)
-            {
-                return;
-            }
-
-            IEventRenderer theme = m_editorForm.Editor.CurrentEventsTheme;
-            if (theme != null &&
-                string.Equals(theme.GetName(), "Technika", StringComparison.OrdinalIgnoreCase))
-            {
-                m_preview.ConfirmTechnikaProfile();
-            }
-            else
-            {
-                m_preview.UseGenericProfile();
-            }
         }
 
         private void ApplyWorkspacePreset(StudioWorkspacePreset preset)
@@ -1310,7 +1293,13 @@ namespace DJMaxEditor
             m_audioList.List.DataSource = model.Instruments;
             m_propertiesForm.Bind(document.Context);
             m_preview.Bind(document.Context);
-            ApplyPreviewProfileFromEventTheme();
+            // The playfield is where a TECHNIKA chart is read - like the reference project,
+            // opening one brings the preview up on its own instead of waiting for a menu.
+            if (m_preview.Profile == GameplayPreviewProfile.Technika &&
+                (!m_preview.Visible || m_preview.IsDisposed))
+            {
+                ShowGameplayPreview();
+            }
             SyncToolButtons(document.Context.Interaction.Tool);
 
             // Re-apply the Notes panel template to the newly active editor so Ctrl+click
@@ -1503,6 +1492,13 @@ namespace DJMaxEditor
             var handler = filterIndex > 0 ?
                 _saveHandler.GetHandlerForFilterIndex(filterIndex) :
                 _saveHandler.GetHandlerForExtension(extension);
+            if (handler == null && model != null && model.SourceFormat.HasValue)
+            {
+                // Extensionless charts carry no extension for the lookup above (detection
+                // is content-based): fall back to the detected format so they still save
+                // back to their own path instead of silently doing nothing.
+                handler = GetSaveHandlerForFormat(model.SourceFormat.Value);
+            }
             if (handler == null)
             {
                 return;
@@ -1768,6 +1764,27 @@ namespace DJMaxEditor
                     return _loadHandler.GetHandlerForExtension(".bms");
                 case DJMaxEditor.Files.FormatDetection.ChartFormat.TechmaniaTrack:
                     return _loadHandler.GetHandlerForExtension(".tech");
+                default:
+                    return null;
+            }
+        }
+
+        // Save-side counterpart of GetHandlerForFormat: the fallback that lets charts
+        // opened without an extension (or with one no handler claims) save back to their
+        // own path with the serializer their detected format implies.
+        private ISaveFile GetSaveHandlerForFormat(DJMaxEditor.Files.FormatDetection.ChartFormat format)
+        {
+            switch (format)
+            {
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.PtffDecrypted:
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.PtffEncryptedTechnika:
+                    return _saveHandler.GetHandlerForExtension(".pt");
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.TrailerRespectV:
+                    return _saveHandler.GetHandlerForExtension(".bytes");
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.BmsClassic:
+                    return _saveHandler.GetHandlerForExtension(".bms");
+                case DJMaxEditor.Files.FormatDetection.ChartFormat.TechmaniaTrack:
+                    return _saveHandler.GetHandlerForExtension(".tech");
                 default:
                     return null;
             }
@@ -2380,6 +2397,33 @@ namespace DJMaxEditor
             saveFileDialog1.Filter = _saveHandler.GetFilter();
             saveFileDialog1.DefaultExt = _saveHandler.GetDefaultExtension();
 
+            // Default to the active document's own folder and name: the dialog is a
+            // shared instance, so without this it would reopen wherever (and as
+            // whatever) a previously saved document left it.
+            string sourcePath = _activeDocument != null
+                ? _activeDocument.Context.SourcePath
+                : null;
+            if (!string.IsNullOrEmpty(sourcePath))
+            {
+                try
+                {
+                    saveFileDialog1.InitialDirectory =
+                        Path.GetDirectoryName(Path.GetFullPath(sourcePath));
+                    saveFileDialog1.FileName = Path.GetFileName(sourcePath);
+                }
+                catch (ArgumentException)
+                {
+                    // A malformed stored path must not break Save As altogether.
+                }
+                catch (PathTooLongException)
+                {
+                }
+            }
+            else
+            {
+                saveFileDialog1.FileName = string.Empty;
+            }
+
             if (saveFileDialog1.ShowDialog() != DialogResult.OK)
             {
                 return;
@@ -2680,7 +2724,6 @@ namespace DJMaxEditor
             }
             ThemeDropDownButton.Text = "Events theme  " + theme.GetName();
             m_notes.ApplyTheme(theme);
-            ApplyPreviewProfileFromEventTheme();
         }
 
         // .pt (PTFF), .bytes (Technika Q trailer) and .tech (TECHMANIA) charts all speak the
@@ -2890,6 +2933,24 @@ namespace DJMaxEditor
 
         private int m_lastPlaybackVirtualTick = -1;
 
+        private readonly Stopwatch m_playbackPumpClock = Stopwatch.StartNew();
+
+        private double m_lastPlaybackFrameMilliseconds = -1;
+
+        private bool m_playbackPumpWasPlaying;
+
+        private string m_lastPerformanceText;
+
+        /// <summary>
+        /// The playback pump, on an 8 ms timer so it runs faster than any display. The
+        /// sequencer's whole-tick rate is tempo * 48 ticks a second - 48/s at 60 BPM, below
+        /// a 60 Hz display - so driving the playhead off the integer tick alone steps at
+        /// best every other frame at low tempos. <see cref="Player.GetCurrentTickExact"/>
+        /// adds the sub-tick remainder and gives a fresh position six times as often (288
+        /// virtual ticks/s at 60 BPM), which is what keeps the playhead line, the follow
+        /// scroll and the preview sweeping smoothly; Invalidate coalesces in WM_PAINT to
+        /// the display's own rate, which is the WinForms frame cap.
+        /// </summary>
         private void PlayerTimer_Tick(object sender, EventArgs e)
         {
             var tm = TimeSpan.FromMilliseconds(m_player.GetCurrentMsTime());
@@ -2901,19 +2962,77 @@ namespace DJMaxEditor
                 currentProgress.Text = progressText;
             }
 
-            if (m_player.IsReady)
+            if (!m_player.IsReady)
             {
-                m_playerData.CurrentTick = tick;
-                int virtualTick = m_playerData.VirtualCurrentTick;
-                if (virtualTick != m_lastPlaybackVirtualTick)
-                {
-                    // Invalidate only when the playhead actually advanced; the
-                    // 8 ms timer then costs nothing on ticks it outruns.
-                    m_lastPlaybackVirtualTick = virtualTick;
-                    m_editorForm.ActiveSurface.PlayheadVirtualTick = virtualTick;
-                }
+                return;
+            }
+
+            bool playing = m_player.IsPlaying;
+            if (playing && !m_playbackPumpWasPlaying)
+            {
+                // (Re)start: drop the stale frame-time baseline so the first reading is honest.
+                m_lastPlaybackFrameMilliseconds = -1;
+                m_lastPlaybackVirtualTick = -1;
+            }
+            m_playbackPumpWasPlaying = playing;
+            if (!playing)
+            {
+                return;
+            }
+
+            double exactTick = m_player.GetCurrentTickExact();
+            int virtualTick = (int)(exactTick * EventData.VirtualTickSize);
+
+            if (virtualTick != m_lastPlaybackVirtualTick)
+            {
+                // The integer position still drives the document model and the preview
+                // frame; the smooth position below drives the paint pass.
+                m_lastPlaybackVirtualTick = virtualTick;
+                m_playerData.CurrentTick = virtualTick / EventData.VirtualTickSize;
+                m_editorForm.ActiveSurface.PlayheadVirtualTick = virtualTick;
                 m_preview.RefreshPlayback();
             }
+
+            m_editorForm.ActiveSurface.PlayheadPositionVirtualTick =
+                exactTick * EventData.VirtualTickSize;
+
+            // One ms / fps entry per painted frame, the same contract as the reference
+            // project's perf readout: the delta is measured between real paint passes
+            // of the timeline surface (the WinForms analogue of the WPF composition
+            // clock), not between this pump's own ticks. The last value stays on the
+            // rail when playback stops.
+            double now = m_playbackPumpClock.Elapsed.TotalMilliseconds;
+            double frameDelta = 0;
+            if (m_editorForm.IsLegacySurfaceActive)
+            {
+                var editor = m_editorForm.Editor;
+                // Only a fresh paint counts - right after pressing play the most recent
+                // paint can be an idle one from long before playback started.
+                if (editor.DebugClockNowMs - editor.DebugLastPaintAtMs < 100)
+                {
+                    frameDelta = editor.DebugLastPaintDeltaMs;
+                }
+            }
+            else
+            {
+                frameDelta = m_lastPlaybackFrameMilliseconds > 0
+                    ? now - m_lastPlaybackFrameMilliseconds
+                    : 0;
+            }
+            if (frameDelta > 0 && m_statusRail != null)
+            {
+                string performanceText = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:0.0} ms  {1:0} fps",
+                    frameDelta,
+                    1000.0 / frameDelta);
+                if (performanceText != m_lastPerformanceText)
+                {
+                    m_lastPerformanceText = performanceText;
+                    m_statusRail.SetPerformance(performanceText);
+                }
+            }
+            m_lastPlaybackFrameMilliseconds = now;
         }
 
         private void currentProgress_Click(object sender, EventArgs e)

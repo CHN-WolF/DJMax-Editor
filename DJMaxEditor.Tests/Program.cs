@@ -10,6 +10,7 @@ using DJMaxEditor.Files;
 using DJMaxEditor.Files.FormatDetection;
 using DJMaxEditor.Files.bytes;
 using DJMaxEditor.Files.pt;
+using DJMaxEditor.Files.Tech;
 
 namespace DJMaxEditor.Tests
 {
@@ -30,11 +31,15 @@ namespace DJMaxEditor.Tests
             string fixtures = null;
             string timelineSnapshots = null;
             string bmsFixtures = null;
+            string perfFile = null;
+            string genChartPath = null;
             for (int i = 0; i < args.Length - 1; i++)
             {
                 if (args[i] == "--fixtures") fixtures = args[i + 1];
                 if (args[i] == "--timeline-snapshots") timelineSnapshots = args[i + 1];
                 if (args[i] == "--bms-fixtures") bmsFixtures = args[i + 1];
+                if (args[i] == "--perf") perfFile = args[i + 1];
+                if (args[i] == "--gen-chart") genChartPath = args[i + 1];
             }
 
             Console.WriteLine("== DJMax Editor test harness ==");
@@ -337,12 +342,27 @@ namespace DJMaxEditor.Tests
             RunTimelineSurfaceTests(fixtures);
             RunTimelineV2ParityTests(fixtures);
             RunGameplayPreviewTests();
+            RunTechnikaSpriteStyleTests();
             RunStudioThemeTests();
             RunStudioShellFoundationTests();
             RunSoundNoteSearchTests();
             if (!string.IsNullOrEmpty(timelineSnapshots))
             {
                 ExportTimelineSnapshots(fixtures, timelineSnapshots);
+            }
+            if (!string.IsNullOrEmpty(perfFile))
+            {
+                RunEditorRenderPerfTests(perfFile);
+                RunEditorHostedPerfTests(perfFile);
+            }
+            if (!string.IsNullOrEmpty(genChartPath))
+            {
+                // Perf-harness feeder: a dense synthetic .tech through the real writer
+                // so --perf exercises the real parse path without committed fixtures.
+                var model = Fixtures.SyntheticChartFactory.Create(24, 3000, 24);
+                File.WriteAllText(genChartPath, TechmaniaChartSerializer.Serialize(model));
+                Console.WriteLine($"[GEN] wrote {genChartPath} " +
+                    $"({model.Tracks.Count()} tracks x 3000 events)");
             }
 
             Console.WriteLine();

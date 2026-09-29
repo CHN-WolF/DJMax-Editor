@@ -3,8 +3,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using DJMaxEditor.Controls.TimelineV2;
-using DJMaxEditor.Controls.TimelineV2.Renderers;
 using DJMaxEditor.Editor;
 using DJMaxEditor.UI;
 
@@ -16,7 +14,10 @@ namespace DJMaxEditor.Preview
         private GameplayPreviewProjection _projection;
         private GameplayPreviewFrame _frame;
         private GameplayPreviewProfile _profile = GameplayPreviewProfile.Generic;
-        private float _noteZoom = 1.35f;
+        private TechnikaScrollDirection _scrollDirection = TechnikaScrollDirection.Clockwise;
+        private float _noteZoom = 1.0f;
+        private readonly TechnikaPlayfieldRenderer _technikaRenderer =
+            new TechnikaPlayfieldRenderer();
 
         public GameplayPreviewControl()
         {
@@ -30,6 +31,11 @@ namespace DJMaxEditor.Preview
             Dock = DockStyle.Fill;
             MinimumSize = new Size(320, 220);
             TabStop = true;
+
+            // The persisted sprite style applies from construction so the preview draws the
+            // owner's chosen set before any document is bound; the form's dropdown re-sends
+            // the same id harmlessly when it initialises.
+            SpriteStyleId = FeatureFlags.PreviewSpriteStyleId;
         }
 
         public EditorDocumentContext Document
@@ -40,6 +46,82 @@ namespace DJMaxEditor.Preview
         public GameplayPreviewProfile Profile
         {
             get { return _profile; }
+        }
+
+        /// <summary>
+        /// The TECHNIKA scroll-direction effector. Changing it re-projects the chart -
+        /// note positions, scanlines, hold bodies and the approach glow all read the one
+        /// direction - so it rebuilds the projection like a profile change does.
+        /// </summary>
+        public TechnikaScrollDirection ScrollDirection
+        {
+            get { return _scrollDirection; }
+            set
+            {
+                if (_scrollDirection == value) return;
+                _scrollDirection = value;
+                RebuildProjection();
+            }
+        }
+
+        /// <summary>The note-series effector (fade in / fade out), applied per paint from
+        /// each note's distance to the sweep.</summary>
+        internal TechnikaNoteFader NoteFader
+        {
+            get { return _technikaRenderer.NoteFader; }
+            set
+            {
+                if (_technikaRenderer.NoteFader == value) return;
+                _technikaRenderer.NoteFader = value;
+                Invalidate();
+            }
+        }
+
+        /// <summary>The timeline-series effector (blink / blind), applied per paint from
+        /// the frame's musical phase.</summary>
+        internal TechnikaLineEffector LineEffector
+        {
+            get { return _technikaRenderer.LineEffector; }
+            set
+            {
+                if (_technikaRenderer.LineEffector == value) return;
+                _technikaRenderer.LineEffector = value;
+                Invalidate();
+            }
+        }
+
+        /// <summary>"ARCADE SPRITES" or "PACKAGED GLYPHS" - which note set the TECHNIKA
+        /// playfield resolved, for the panel header. A named style reports its own name
+        /// (<c>T3 STAR #03</c>) instead.</summary>
+        internal string SpriteSourceLabel
+        {
+            get { return _technikaRenderer.SpriteSourceLabel; }
+        }
+
+        /// <summary>
+        /// The SPRITE SET choice, as a catalog style id. Resolving goes through the catalog
+        /// rather than straight to the renderer so a persisted id that no longer matches
+        /// anything on disk falls back to the same answer AUTO would give, instead of
+        /// failing or rendering nothing.
+        /// </summary>
+        internal string SpriteStyleId
+        {
+            set
+            {
+                TechnikaSpriteStyle style = TechnikaSpriteCatalog.Resolve(value);
+                if (_technikaRenderer.SetSpriteStyle(style))
+                {
+                    Invalidate();
+                }
+            }
+        }
+
+        /// <summary>The playback position the current frame was built at, or 0 before a
+        /// document is bound. Surfaced in the header status line, which is where the
+        /// floating overlay used to draw it.</summary>
+        internal int CurrentTick
+        {
+            get { return _frame == null ? 0 : _frame.CurrentTick; }
         }
 
         public float NoteZoom
@@ -147,20 +229,26 @@ namespace DJMaxEditor.Preview
 
             if (_projection.Profile == GameplayPreviewProfile.Technika)
             {
-                DrawTechnikaFrame(graphics, viewport);
+                _technikaRenderer.Paint(
+                    graphics, viewport, _projection, _frame, _noteZoom);
             }
             else
             {
                 DrawGenericFrame(graphics, viewport);
             }
-            DrawOverlay(graphics, viewport);
         }
 
         private void RebuildProjection()
         {
+            // Re-probe for sprites an owner may have dropped in since startup; a changed set
+            // is worth a repaint even when the projection itself is unchanged.
+            if (_technikaRenderer.ReloadSprites())
+            {
+                Invalidate();
+            }
             _projection = _document == null
                 ? null
-                : GameplayPreviewProjector.Project(_document.Model, _profile);
+                : GameplayPreviewProjector.Project(_document.Model, _profile, _scrollDirection);
             RefreshPlayback();
         }
 
@@ -189,50 +277,6 @@ namespace DJMaxEditor.Preview
                     muted,
                     viewport.Left + 18,
                     viewport.Top + 54);
-            }
-        }
-
-        private void DrawTechnikaFrame(Graphics graphics, Rectangle viewport)
-        {
-            int middle = viewport.Top + viewport.Height / 2;
-            Rectangle top = new Rectangle(
-                viewport.Left, viewport.Top, viewport.Width, viewport.Height / 2);
-            Rectangle bottom = new Rectangle(
-                viewport.Left, middle, viewport.Width, viewport.Bottom - middle);
-
-            using (var topBrush = new SolidBrush(StudioDesignSystem.Deck))
-            using (var bottomBrush = new SolidBrush(Color.FromArgb(18, 28, 42)))
-            using (var border = new Pen(StudioDesignSystem.Border))
-            using (var lanePen = new Pen(Color.FromArgb(100, StudioDesignSystem.Border)))
-            {
-                graphics.FillRectangle(topBrush, top);
-                graphics.FillRectangle(bottomBrush, bottom);
-                graphics.DrawRectangle(border, viewport);
-                graphics.DrawLine(border, viewport.Left, middle, viewport.Right, middle);
-                DrawLaneGrid(graphics, top, _projection.LaneCount, lanePen);
-                DrawLaneGrid(graphics, bottom, _projection.LaneCount, lanePen);
-            }
-
-            foreach (ProjectedGameplayNote note in _frame.Notes)
-            {
-                if (note.State == GameplayPreviewNoteState.Resolved ||
-                    note.State == GameplayPreviewNoteState.Inactive)
-                {
-                    continue;
-                }
-                DrawTechnikaNote(graphics, viewport, note);
-            }
-
-            bool topScan = (_frame.CurrentIntScan & 1) == 1;
-            double scanBase = 0.15 + 0.75 * _frame.CurrentPhase;
-            double scanX = topScan ? scanBase : 1.0 - scanBase;
-            int x = viewport.Left + (int)Math.Round(scanX * viewport.Width);
-            Rectangle half = topScan ? top : bottom;
-            using (var glow = new Pen(Color.FromArgb(62, StudioDesignSystem.PulseCyan), 7f))
-            using (var scan = new Pen(StudioDesignSystem.PulseCyan, 2f))
-            {
-                graphics.DrawLine(glow, x, half.Top + 1, x, half.Bottom - 1);
-                graphics.DrawLine(scan, x, half.Top + 1, x, half.Bottom - 1);
             }
         }
 
@@ -282,161 +326,6 @@ namespace DJMaxEditor.Preview
             {
                 int y = rectangle.Top + (rectangle.Height * lane / lanes);
                 graphics.DrawLine(pen, rectangle.Left, y, rectangle.Right, y);
-            }
-        }
-
-        private void DrawTechnikaNote(
-            Graphics graphics,
-            Rectangle viewport,
-            ProjectedGameplayNote note)
-        {
-            int x = viewport.Left + (int)Math.Round(note.X * viewport.Width);
-            int y = viewport.Top + (int)Math.Round(note.Y * viewport.Height);
-            int lanePixels = Math.Max(12,
-                viewport.Height / (2 * Math.Max(1, _projection.LaneCount)));
-            int size = Math.Max(10,
-                (int)Math.Round(lanePixels * 0.62f * _noteZoom));
-            int alpha = note.State == GameplayPreviewNoteState.Prepare ? 150 : 240;
-            Color color = NoteColor(note.Kind);
-
-            if (note.ApproachVisible)
-            {
-                int ringSize = size + (int)Math.Round((1.0 - note.ApproachProgress) * size * 1.6);
-                using (var ring = new Pen(Color.FromArgb(140, color), 2f))
-                {
-                    graphics.DrawEllipse(
-                        ring,
-                        x - ringSize / 2,
-                        y - ringSize / 2,
-                        ringSize,
-                        ringSize);
-                }
-            }
-
-            if (note.DurationPulse > 30 &&
-                note.Kind != GameplayPreviewNoteKind.Basic &&
-                note.Kind != GameplayPreviewNoteKind.ChainHead &&
-                note.Kind != GameplayPreviewNoteKind.ChainNode)
-            {
-                int trail = Math.Max(size, Math.Min(viewport.Width / 3,
-                    note.DurationPulse * viewport.Width / (960 * 2)));
-                int direction = note.IsTopHalf ? 1 : -1;
-                using (var trailBrush = new SolidBrush(Color.FromArgb(alpha / 2, color)))
-                {
-                    graphics.FillRectangle(
-                        trailBrush,
-                        direction > 0 ? x : x - trail,
-                        y - Math.Max(2, size / 6),
-                        trail,
-                        Math.Max(4, size / 3));
-                }
-            }
-
-            using (var glow = new SolidBrush(Color.FromArgb(48, color)))
-            {
-                graphics.FillEllipse(glow,
-                    x - size, y - size, size * 2, size * 2);
-            }
-
-            bool drewAuthenticArt = TechnikaNoteArt.TryDraw(
-                graphics,
-                ToTechnikaKind(note.Kind),
-                x,
-                y,
-                size + 4,
-                alpha / 255f);
-            if (!drewAuthenticArt)
-            {
-                using (var body = new SolidBrush(Color.FromArgb(alpha, color)))
-                using (var edge = new Pen(StudioDesignSystem.Frost, 1.25f))
-                {
-                    graphics.FillEllipse(body,
-                        x - size / 2, y - size / 2, size, size);
-                    graphics.DrawEllipse(edge,
-                        x - size / 2, y - size / 2, size, size);
-                }
-            }
-        }
-
-        private static TechnikaNoteKind ToTechnikaKind(GameplayPreviewNoteKind kind)
-        {
-            switch (kind)
-            {
-                case GameplayPreviewNoteKind.Basic:
-                    return TechnikaNoteKind.Basic;
-                case GameplayPreviewNoteKind.Drag:
-                    return TechnikaNoteKind.Drag;
-                case GameplayPreviewNoteKind.ChainHead:
-                    return TechnikaNoteKind.ChainHead;
-                case GameplayPreviewNoteKind.ChainNode:
-                    return TechnikaNoteKind.ChainNode;
-                case GameplayPreviewNoteKind.RepeatHead:
-                    return TechnikaNoteKind.RepeatHead;
-                case GameplayPreviewNoteKind.RepeatHeadHold:
-                    return TechnikaNoteKind.RepeatHeadHold;
-                case GameplayPreviewNoteKind.Repeat:
-                    return TechnikaNoteKind.Repeat;
-                case GameplayPreviewNoteKind.RepeatHold:
-                    return TechnikaNoteKind.RepeatHold;
-                case GameplayPreviewNoteKind.Hold:
-                    return TechnikaNoteKind.Hold;
-                default:
-                    return TechnikaNoteKind.Unknown;
-            }
-        }
-
-        private void DrawOverlay(Graphics graphics, Rectangle viewport)
-        {
-            string diagnostics = DiagnosticCount == 0
-                ? "NO PROJECTION WARNINGS"
-                : DiagnosticCount + " PROJECTION WARNING" +
-                    (DiagnosticCount == 1 ? string.Empty : "S");
-            using (var panel = new SolidBrush(Color.FromArgb(225, StudioDesignSystem.Void)))
-            using (var status = StudioDesignSystem.UtilityFont(7.5f))
-            using (var statusBrush = new SolidBrush(StudioDesignSystem.Frost))
-            using (var detailBrush = new SolidBrush(
-                DiagnosticCount == 0
-                    ? StudioDesignSystem.Muted
-                    : StudioDesignSystem.SignalAmber))
-            {
-                var box = new Rectangle(
-                    viewport.Left + 10,
-                    viewport.Top + 10,
-                    Math.Min(viewport.Width - 20, 455),
-                    44);
-                graphics.FillRectangle(panel, box);
-                graphics.DrawString(
-                    _projection.StatusLabel,
-                    status,
-                    statusBrush,
-                    box.Left + 10,
-                    box.Top + 7);
-                graphics.DrawString(
-                    "TICK " + _frame.CurrentTick + "  |  " + diagnostics,
-                    status,
-                    detailBrush,
-                    box.Left + 10,
-                    box.Top + 24);
-            }
-        }
-
-        private static Color NoteColor(GameplayPreviewNoteKind kind)
-        {
-            switch (kind)
-            {
-                case GameplayPreviewNoteKind.ChainHead:
-                case GameplayPreviewNoteKind.ChainNode:
-                    return StudioDesignSystem.AutomationGreen;
-                case GameplayPreviewNoteKind.RepeatHead:
-                case GameplayPreviewNoteKind.RepeatHeadHold:
-                case GameplayPreviewNoteKind.Repeat:
-                case GameplayPreviewNoteKind.RepeatHold:
-                    return StudioDesignSystem.BeatViolet;
-                case GameplayPreviewNoteKind.Hold:
-                case GameplayPreviewNoteKind.Drag:
-                    return StudioDesignSystem.SignalAmber;
-                default:
-                    return StudioDesignSystem.PulseCyan;
             }
         }
     }

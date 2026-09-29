@@ -113,6 +113,16 @@ namespace DJMaxEditor.Controls.TimelineV2
             }
         }
 
+        /// <summary>
+        /// Sub-tick playhead position. The V2 timeline is a read-only prototype and keeps
+        /// its integer playhead; it rounds the smooth position and behaves as before.
+        /// </summary>
+        public double PlayheadPositionVirtualTick
+        {
+            get { return _playheadVirtualTick; }
+            set { PlayheadVirtualTick = (int)Math.Round(value); }
+        }
+
         public void Bind(EditorDocumentContext document)
         {
             if (document == null) throw new ArgumentNullException("document");

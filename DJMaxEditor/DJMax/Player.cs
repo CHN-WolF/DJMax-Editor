@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 
 namespace DJMaxEditor.DJMax
@@ -150,6 +150,26 @@ namespace DJMaxEditor.DJMax
         public int GetCurrentTick()
         {
             return m_curTick;
+        }
+
+        /// <summary>
+        /// The playhead position including the sub-tick remainder the sequencer already
+        /// carries. <see cref="GetCurrentTick"/> only moves at the sequencer's whole-tick
+        /// rate - tempo * 48 ticks a second, so 48/s at 60 BPM - which is slower than a
+        /// 60 Hz display no matter how often the caller asks. The remainder in
+        /// m_leftMsTime is the part of the elapsed time that has not rounded into a tick
+        /// yet; dividing it by the period in force puts the playhead between ticks, so a
+        /// surface that wants motion finer than the sequencer clock can round it as finely
+        /// as it likes. The playback pump rounds to virtual ticks (six per native tick).
+        /// </summary>
+        public double GetCurrentTickExact()
+        {
+            double fraction = m_period > 0.0 ? m_leftMsTime / m_period : 0.0;
+            if (fraction <= 0.0 || fraction >= 1.0)
+            {
+                return m_curTick;
+            }
+            return m_curTick + fraction;
         }
 
         // Retrieve the current ms time

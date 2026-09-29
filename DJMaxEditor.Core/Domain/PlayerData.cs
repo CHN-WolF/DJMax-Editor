@@ -70,6 +70,16 @@ namespace DJMaxEditor.DJMax
 
         public int VirtualCurrentTick { get; private set; } = 0;
 
+        /// <summary>
+        /// Playhead position at sub-tick precision, in virtual ticks. The whole-tick
+        /// <see cref="VirtualCurrentTick"/> advances at tempo * 48 ticks a second, below a
+        /// display's refresh rate at low tempos; whoever drives playback each frame (the
+        /// hosted benchmark harness writes it directly; MainForm feeds
+        /// IEditorSurface.PlayheadPositionVirtualTick from Player.GetCurrentTickExact)
+        /// keeps the sub-tick remainder here so smooth playhead surfaces can read it back.
+        /// </summary>
+        public double SmoothVirtualCurrentTick { get; set; }
+
         public int CurrentTick
         {
             get => VirtualCurrentTick / EventData.VirtualTickSize;

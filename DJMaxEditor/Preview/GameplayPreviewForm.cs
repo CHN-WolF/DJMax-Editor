@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
@@ -8,17 +9,33 @@ using DJMaxEditor.UI;
 namespace DJMaxEditor.Preview
 {
     /// <summary>
-    /// Dockable, read-only visualization of the active document. Profile choices
-    /// are session-only and perform no settings or layout file I/O.
+    /// Dockable, read-only visualization of the active document. The profile is not a
+    /// choice anymore: it is resolved from the chart on bind, so a TECHNIKA chart opens
+    /// in the TECHNIKA projection with nothing to confirm. Effector toggles stay
+    /// session-only; the sprite set is the other exception - its style id, and any
+    /// explicit Technika 3 asset folder the owner picks, persist as user settings so the
+    /// chosen note art survives a restart.
     /// </summary>
     public sealed class GameplayPreviewForm : ToolWindow
     {
         private readonly GameplayPreviewControl _preview;
         private readonly Label _status;
-        private readonly Button _generic;
-        private readonly Button _technika;
         private readonly TrackBar _zoom;
-        private const long PlaybackFrameIntervalMilliseconds = 33;
+        private readonly ComboBox _scroll;
+        private readonly ComboBox _fader;
+        private readonly ComboBox _line;
+        private readonly ComboBox _spriteSet;
+        private readonly Button _browseSpriteRoot;
+
+        /// <summary>The catalog the dropdown currently lists. Rebuilt (and the dropdown
+        /// refilled) when a newly browsed asset path changes what exists; the combo's item
+        /// order is this list's order.</summary>
+        private List<TechnikaSpriteStyle> _spriteStyles;
+
+        /// <summary>Guards the dropdown while it is being (re)filled, so programmatic index
+        /// changes are not mistaken for the owner's choice and persisted.</summary>
+        private bool _updatingSpriteSet;
+        private const long PlaybackFrameIntervalMilliseconds = 15;
         private readonly Stopwatch _playbackClock = Stopwatch.StartNew();
         private long _lastPlaybackFrameMilliseconds = -PlaybackFrameIntervalMilliseconds;
 
@@ -32,6 +49,11 @@ namespace DJMaxEditor.Preview
             TabText = "Gameplay Preview";
             Text = "Gameplay Preview";
 
+            // The header wraps: the form docks right and is often narrower than the
+            // full control row, so everything below flows (FlowLayoutPanel) instead
+            // of sitting at fixed x positions and getting clipped. The header's
+            // height is synced to the flow's wrapped height - AutoSize on the
+            // header itself does not follow a docked autosize child reliably.
             var header = new Panel
             {
                 BackColor = StudioDesignSystem.Deck,
@@ -42,52 +64,142 @@ namespace DJMaxEditor.Preview
             var title = new Label
             {
                 AutoSize = true,
+                Dock = DockStyle.Top,
                 Font = StudioDesignSystem.DisplayFont(10f),
                 ForeColor = StudioDesignSystem.Frost,
-                Location = new Point(12, 8),
                 Text = "PLAYBACK VISUALIZER"
             };
             _status = new Label
             {
                 AutoEllipsis = true,
-                Font = StudioDesignSystem.UtilityFont(7.5f),
+                Dock = DockStyle.Top,
+                Font = StudioDesignSystem.UtilityFont(8f),
                 ForeColor = StudioDesignSystem.Muted,
-                Location = new Point(12, 30),
-                Size = new Size(660, 24),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Height = 22,
                 Text = "NO DOCUMENT"
             };
-            _generic = BuildProfileButton("GENERIC", 12);
-            _technika = BuildProfileButton("TECHNIKA", 100);
             _zoom = new TrackBar
             {
                 AutoSize = false,
                 BackColor = StudioDesignSystem.Deck,
                 LargeChange = 2,
-                Location = new Point(194, 62),
                 Maximum = 250,
                 Minimum = 75,
-                SmallChange = 5,
-                Size = new Size(160, 30),
+                Size = new Size(180, 30),
                 TickStyle = TickStyle.None,
-                Value = 135
+                Value = 100
             };
-            _generic.Click += delegate { SetProfile(GameplayPreviewProfile.Generic); };
-            _technika.Click += delegate { SetProfile(GameplayPreviewProfile.Technika); };
             _zoom.ValueChanged += delegate
             {
                 _preview.NoteZoom = _zoom.Value / 100f;
             };
-            header.Controls.Add(title);
+
+            // The arcade's chart effectors, as session-only toggles: scroll direction
+            // re-projects the field, fader and line gate what each paint draws.
+            _scroll = BuildEffectorCombo(new object[]
+            {
+                "OFF", "Reverse", "Left ALL", "Right ALL"
+            });
+            _scroll.SelectedIndexChanged += delegate
+            {
+                if (_scroll.SelectedIndex >= 0)
+                {
+                    _preview.ScrollDirection = (TechnikaScrollDirection)_scroll.SelectedIndex;
+                }
+            };
+            _fader = BuildEffectorCombo(new object[]
+            {
+                "OFF", "FADE IN", "FADE IN 2", "FADE OUT", "FADE OUT 2"
+            });
+            _fader.SelectedIndexChanged += delegate
+            {
+                if (_fader.SelectedIndex >= 0)
+                {
+                    _preview.NoteFader = (TechnikaNoteFader)_fader.SelectedIndex;
+                }
+            };
+            _line = BuildEffectorCombo(new object[]
+            {
+                "ON", "BLINK", "BLINK2", "BLIND"
+            });
+            _line.SelectedIndexChanged += delegate
+            {
+                if (_line.SelectedIndex >= 0)
+                {
+                    _preview.LineEffector = (TechnikaLineEffector)_line.SelectedIndex;
+                }
+            };
+
+            // The sprite set persists: the combo lists the whole catalog (AUTO
+            // first, arcade sources by arcade numbering, PACKAGED last) and the
+            // "…" button points the probe at an install the automatic search did
+            // not find. In the header flow it leads the row, before the note-size
+            // slider and the session-only effectors.
+            _spriteStyles = new List<TechnikaSpriteStyle>(TechnikaSpriteCatalog.Build());
+            var spriteSetNames = new object[_spriteStyles.Count];
+            for (int i = 0; i < _spriteStyles.Count; i++)
+            {
+                spriteSetNames[i] = _spriteStyles[i].DisplayName;
+            }
+            _spriteSet = BuildEffectorCombo(spriteSetNames);
+            _spriteSet.SelectedIndexChanged += delegate
+            {
+                if (_updatingSpriteSet || _spriteSet.SelectedIndex < 0)
+                {
+                    return;
+                }
+                ApplySpriteStyle(_spriteStyles[_spriteSet.SelectedIndex]);
+            };
+            _browseSpriteRoot = StudioDesignSystem.CreateDeckButton("…");
+            _browseSpriteRoot.Size = new Size(24, 21);
+            _browseSpriteRoot.Click += delegate { BrowseSpriteRoot(); };
+
+            var effectorsCaption = new Label
+            {
+                AutoSize = true,
+                Font = StudioDesignSystem.UtilityFont(8f),
+                ForeColor = StudioDesignSystem.Muted,
+                Margin = new Padding(4, 16, -8, 0),
+                Text = "EFFECTORS"
+            };
+
+            var effectorRow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                BackColor = StudioDesignSystem.Deck,
+                Dock = DockStyle.Top,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                WrapContents = true
+            };
+            // Sprite set first (it persists, unlike the session effectors), then
+            // the EFFECTORS caption marks off the arcade effector group.
+            effectorRow.Controls.Add(BuildEffectorUnit("SPRITE SET", _spriteSet, 126, 28, 35, _browseSpriteRoot));
+            effectorRow.Controls.Add(BuildEffectorUnit("NOTE SIZE", _zoom, 180, 0, 44));
+            effectorRow.Controls.Add(effectorsCaption);
+            effectorRow.Controls.Add(BuildEffectorUnit("TimeLine", _scroll));
+            effectorRow.Controls.Add(BuildEffectorUnit("NOTE FADER", _fader));
+            effectorRow.Controls.Add(BuildEffectorUnit("LINE", _line));
+
+            // Docking stacks children in reverse add order: title, then status,
+            // then the wrapping effector row at the bottom of the header.
+            header.Controls.Add(effectorRow);
             header.Controls.Add(_status);
-            header.Controls.Add(_generic);
-            header.Controls.Add(_technika);
-            header.Controls.Add(_zoom);
+            header.Controls.Add(title);
+            SyncHeaderHeight(header, title, _status, effectorRow);
+            EventHandler sync = delegate { SyncHeaderHeight(header, title, _status, effectorRow); };
+            effectorRow.Resize += sync;
+            title.Resize += sync;
+            _status.Resize += sync;
 
             _preview = new GameplayPreviewControl();
             Controls.Add(_preview);
             Controls.Add(header);
-            SetProfile(GameplayPreviewProfile.Generic);
+            SelectSpriteStyle(TechnikaSpriteCatalog.Resolve(
+                FeatureFlags.PreviewSpriteStyleId, _spriteStyles));
+            SetProfile(GameplayPreviewProfile.Technika);
         }
 
         public EditorDocumentContext Document
@@ -108,22 +220,12 @@ namespace DJMaxEditor.Preview
         public void Bind(EditorDocumentContext document)
         {
             _preview.Bind(document);
-            if (document == null)
-            {
-                SetProfile(GameplayPreviewProfile.Generic);
-            }
-            else
-            {
-                GameplayPreviewProfileSuggestion suggestion =
-                    GameplayPreviewProfileResolver.Suggest(document.Model);
-                SetProfile(suggestion.RequiresConfirmation
-                    ? GameplayPreviewProfile.Generic
-                    : suggestion.Profile);
-                _status.Text = suggestion.RequiresConfirmation
-                    ? "PTFF IS AMBIGUOUS  |  CHOOSE TECHNIKA TO CONFIRM"
-                    : suggestion.Explanation.ToUpperInvariant();
-            }
-            UpdateStatus();
+            // The profile follows the chart: TECHNIKA-shaped data opens in the TECHNIKA
+            // projection (PTFF included - no confirmation step), anything else stays on
+            // the generic lanes through the guard inside SetProfile.
+            SetProfile(document == null
+                ? GameplayPreviewProfile.Technika
+                : GameplayPreviewProfileResolver.Suggest(document.Model).Profile);
         }
 
         public void ConfirmTechnikaProfile()
@@ -180,12 +282,110 @@ namespace DJMaxEditor.Preview
                 GameplayPreviewProfileResolver.Suggest(_preview.Document.Model).Profile !=
                     GameplayPreviewProfile.Technika)
             {
+                // The chart does not speak TECHNIKA note vocabulary (a BMS chart, an XML
+                // chart): the two-way projection would misread its tracks, so the generic
+                // lanes stay in force no matter what the caller asked for.
                 profile = GameplayPreviewProfile.Generic;
             }
             _preview.SetProfile(profile);
-            StyleProfileButton(_generic, profile == GameplayPreviewProfile.Generic);
-            StyleProfileButton(_technika, profile == GameplayPreviewProfile.Technika);
             UpdateStatus();
+        }
+
+        /// <summary>The dropdown changed because the owner picked a style: persist the id
+        /// and hand it to the preview, which resolves it against a fresh catalog.</summary>
+        private void ApplySpriteStyle(TechnikaSpriteStyle style)
+        {
+            FeatureFlags.SetPreviewSpriteStyleId(style.Id);
+            _preview.SpriteStyleId = style.Id;
+            UpdateStatus();
+        }
+
+        /// <summary>Shows the folder picker for the Technika 3 data, stores the resolved
+        /// MainGame root (or the raw pick when it is not recognisable, so a repair later
+        /// still has what the owner meant), and rebuilds the catalog so the new source
+        /// appears in the dropdown immediately.</summary>
+        private void BrowseSpriteRoot()
+        {
+            using (var dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Locate the DJMax Technika 3 MainGame folder " +
+                    "(the one containing 'note' and 'CoolBomb').";
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                string root = TechnikaSpriteCatalog.ResolveMainGameRoot(dialog.SelectedPath);
+                FeatureFlags.SetTechnika3AssetPath(root ?? dialog.SelectedPath);
+            }
+            RebuildSpriteCatalog();
+        }
+
+        /// <summary>Rebuilds the catalog after the asset path changed and re-points the
+        /// dropdown at the still-current style, falling back the same way an unknown
+        /// persisted id does when the style no longer exists. The fallback is displayed
+        /// but not persisted: what the owner chose stays chosen, and repairs itself if
+        /// the data ever comes back.</summary>
+        private void RebuildSpriteCatalog()
+        {
+            string currentId = _spriteSet.SelectedIndex >= 0
+                ? _spriteStyles[_spriteSet.SelectedIndex].Id
+                : FeatureFlags.PreviewSpriteStyleId;
+            _spriteStyles = new List<TechnikaSpriteStyle>(TechnikaSpriteCatalog.Build());
+            TechnikaSpriteStyle resolved = TechnikaSpriteCatalog.Resolve(currentId, _spriteStyles);
+
+            _updatingSpriteSet = true;
+            try
+            {
+                _spriteSet.BeginUpdate();
+                _spriteSet.Items.Clear();
+                for (int i = 0; i < _spriteStyles.Count; i++)
+                {
+                    _spriteSet.Items.Add(_spriteStyles[i].DisplayName);
+                }
+                _spriteSet.SelectedIndex = IndexOfSpriteStyle(resolved.Id);
+                _spriteSet.EndUpdate();
+            }
+            finally
+            {
+                _updatingSpriteSet = false;
+            }
+
+            _preview.SpriteStyleId = resolved.Id;
+            UpdateStatus();
+        }
+
+        /// <summary>Points the dropdown at one style without persisting anything: startup
+        /// selection shows what the settings file asked for (already resolved through the
+        /// catalog by the caller) but only an owner action writes settings.</summary>
+        private void SelectSpriteStyle(TechnikaSpriteStyle style)
+        {
+            int index = IndexOfSpriteStyle(style.Id);
+            if (index < 0)
+            {
+                return;
+            }
+            _updatingSpriteSet = true;
+            try
+            {
+                _spriteSet.SelectedIndex = index;
+            }
+            finally
+            {
+                _updatingSpriteSet = false;
+            }
+            _preview.SpriteStyleId = style.Id;
+        }
+
+        private int IndexOfSpriteStyle(string id)
+        {
+            for (int i = 0; i < _spriteStyles.Count; i++)
+            {
+                if (string.Equals(_spriteStyles[i].Id, id, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         private void UpdateStatus()
@@ -195,7 +395,12 @@ namespace DJMaxEditor.Preview
                 _status.Text = "NO DOCUMENT";
                 return;
             }
+            string source = _preview.Profile == GameplayPreviewProfile.Technika
+                ? "  |  " + _preview.SpriteSourceLabel
+                : string.Empty;
             _status.Text = _preview.ProjectionStatus +
+                "  |  TICK " + _preview.CurrentTick +
+                source +
                 (_preview.DiagnosticCount == 0
                     ? string.Empty
                     : "  |  " + _preview.DiagnosticCount + " WARNING(S)");
@@ -209,25 +414,71 @@ namespace DJMaxEditor.Preview
             return !IsDisposed && Visible && _preview.Visible;
         }
 
-        private static Button BuildProfileButton(string text, int left)
+        /// <summary>The flow panel wraps when the docked window is narrow; the
+        /// header follows its height so no row is cut off.</summary>
+        private static void SyncHeaderHeight(Panel header, Control title, Control status, Control effectorRow)
         {
-            Button button = StudioDesignSystem.CreateDeckButton(text);
-            button.Location = new Point(left, 62);
-            button.Size = new Size(82, 30);
-            return button;
+            int height = header.Padding.Vertical +
+                title.Height +
+                status.Height +
+                effectorRow.Height;
+            if (header.Height != height)
+            {
+                header.Height = height;
+            }
         }
 
-        private static void StyleProfileButton(Button button, bool selected)
+        /// <summary>A caption glued above its editor control, so the flow panel
+        /// wraps each pair as one unit instead of separating label from combo.</summary>
+        private static Control BuildEffectorUnit(
+            string caption,
+            Control editor,
+            int editorWidth = 126,
+            int extraRight = 0,
+            int unitHeight = 35,
+            Control extra = null)
         {
-            button.BackColor = selected
-                ? StudioDesignSystem.Selected
-                : StudioDesignSystem.Lift;
-            button.ForeColor = selected
-                ? StudioDesignSystem.PulseCyan
-                : StudioDesignSystem.Muted;
-            button.FlatAppearance.BorderColor = selected
-                ? StudioDesignSystem.PulseCyan
-                : StudioDesignSystem.Border;
+            var unit = new Panel
+            {
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 2, 12, 2),
+                Size = new Size(editorWidth + extraRight + (extra != null ? extra.Width + 2 : 0), unitHeight)
+            };
+            var label = new Label
+            {
+                AutoSize = true,
+                Font = StudioDesignSystem.UtilityFont(8f),
+                ForeColor = StudioDesignSystem.Muted,
+                Location = new Point(0, 0),
+                Text = caption
+            };
+            editor.Location = new Point(0, 14);
+            if (editorWidth > 0 && editor.Width != editorWidth)
+            {
+                editor.Width = editorWidth;
+            }
+            unit.Controls.Add(label);
+            unit.Controls.Add(editor);
+            if (extra != null)
+            {
+                extra.Location = new Point(editor.Width + 2, 14);
+                unit.Controls.Add(extra);
+            }
+            return unit;
+        }
+
+        private static ComboBox BuildEffectorCombo(object[] items)
+        {
+            var combo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                FlatStyle = FlatStyle.Flat,
+                Font = StudioDesignSystem.UtilityFont(8f),
+                Size = new Size(126, 21)
+            };
+            combo.Items.AddRange(items);
+            combo.SelectedIndex = 0;
+            return combo;
         }
     }
 }
