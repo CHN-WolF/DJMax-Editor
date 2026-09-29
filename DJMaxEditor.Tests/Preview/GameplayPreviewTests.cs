@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using DJMaxEditor.DJMax;
 using DJMaxEditor.Editor;
 using DJMaxEditor.Files.FormatDetection;
@@ -404,6 +405,165 @@ namespace DJMaxEditor.Tests
                     control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
                     AssertTrue(bitmap.GetPixel(480, 270) != Color.Empty,
                         "effector paint produced no drawable frame");
+                }
+            });
+
+            Test("GameplayPreview_ScrollSpeedDrivesTheSweepNotTheNotes", () =>
+            {
+                PlayerData model = PreviewModel(ChartFormat.PtffDecrypted, 4);
+                EventData behind = AddPreviewNote(model, 0, 96, 0, 6);
+                EventData ahead = AddPreviewNote(model, 1, 192, 0, 6);
+                EventData far = AddPreviewNote(model, 2, 384, 0, 6);
+                GameplayPreviewProjection chart =
+                    GameplayPreviewProjector.Project(model, GameplayPreviewProfile.Technika);
+
+                GameplayPreviewFrame normal = chart.CreateRenderableFrame(96, 1.0);
+                GameplayPreviewFrame fast = chart.CreateRenderableFrame(96, 2.0);
+
+                // The sweep itself runs at twice the musical rate.
+                AssertPreviewNear(fast.CurrentScan, normal.CurrentScan * 2.0, 1e-9,
+                    "2x did not double the sweep position");
+                AssertTrue(fast.CurrentIntScan == 1,
+                    "2x sweep did not advance into the next scan");
+
+                // Notes never move: the same note keeps its authored scan, half
+                // and X at any speed.
+                ProjectedGameplayNote normalAhead =
+                    normal.Notes.Single(n => n.Source == ahead);
+                ProjectedGameplayNote fastAhead =
+                    fast.Notes.Single(n => n.Source == ahead);
+                AssertTrue(fastAhead.ScanIndex == normalAhead.ScanIndex &&
+                    fastAhead.RelativeScan == normalAhead.RelativeScan &&
+                    fastAhead.X == normalAhead.X &&
+                    fastAhead.IsTopHalf == normalAhead.IsTopHalf,
+                    "a note moved when the sweep speed changed");
+
+                // The state machine answers to the faster sweep: the note one scan
+                // ahead is already Active, and the note the fast sweep crossed has
+                // fallen off the stage behind it (at musical speed it is still on).
+                AssertTrue(fastAhead.State == GameplayPreviewNoteState.Active,
+                    "the faster sweep did not activate the waiting note sooner");
+                AssertTrue(!fast.Notes.Any(n => n.Source == behind),
+                    "the note the fast sweep passed should be off stage");
+                AssertTrue(normal.Notes.Single(n => n.Source == behind).State ==
+                    GameplayPreviewNoteState.Active,
+                    "the musical sweep should still be on that note");
+
+                // The stage follows the sweep: a note two scans ahead musically is
+                // off stage at 1x but already waiting at 2x.
+                AssertTrue(!normal.Notes.Any(n => n.Source == far),
+                    "default-speed frame staged a note two scans ahead");
+                AssertTrue(fast.Notes.Any(n => n.Source == far),
+                    "2x sweep did not bring the further note on stage");
+            });
+
+            Test("GameplayPreview_HalfSpeedKeepsEarlierNotesOnStage", () =>
+            {
+                PlayerData model = PreviewModel(ChartFormat.PtffDecrypted, 4);
+                EventData early = AddPreviewNote(model, 0, 96, 0, 6);
+                GameplayPreviewProjection chart =
+                    GameplayPreviewProjector.Project(model, GameplayPreviewProfile.Technika);
+
+                // At tick 192 the musical sweep has left scan 0; at half speed it
+                // is still back there, so the scan-0 note stays on stage.
+                AssertTrue(!chart.CreateRenderableFrame(192, 1.0).Notes.Any(n => n.Source == early),
+                    "default-speed frame staged a note the sweep already left");
+                AssertTrue(chart.CreateRenderableFrame(192, 0.5).Notes.Any(n => n.Source == early),
+                    "half-speed sweep dropped the note it has not reached");
+            });
+
+            Test("GameplayPreview_BytesScrollSpeedComesFromTrack19", () =>
+            {
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(null) == 1.0,
+                    "no model must keep the default speed");
+
+                PlayerData pt = PreviewModel(ChartFormat.PtffDecrypted, 4);
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(pt) == 1.0,
+                    "PT charts must not auto-detect speed");
+
+                PlayerData bytes = PreviewModel(ChartFormat.TrailerRespectV, 4);
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(bytes) == 1.0,
+                    "BYTES without a speed track must keep the default");
+
+                var speedTrack = new TrackData(19);
+                bytes.Tracks.AddTrack(speedTrack);
+                speedTrack.AddEvent(new EventData
+                {
+                    EventType = EventType.Note,
+                    Tick = 0,
+                    Attribute = 1
+                });
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(bytes) == 0.5,
+                    "Track 19 attribute 1 must mean half speed");
+
+                speedTrack.RemoveEvent(speedTrack.Events.First());
+                speedTrack.AddEvent(new EventData
+                {
+                    EventType = EventType.Note,
+                    Tick = 0,
+                    Attribute = 2
+                });
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(bytes) == 2.0,
+                    "Track 19 attribute 2 must mean double speed");
+
+                speedTrack.RemoveEvent(speedTrack.Events.First());
+                speedTrack.AddEvent(new EventData
+                {
+                    EventType = EventType.Note,
+                    Tick = 0,
+                    Attribute = 0
+                });
+                AssertTrue(GameplayPreviewForm.DetectScrollSpeed(bytes) == 1.0,
+                    "an empty Track 19 attribute must keep the default");
+            });
+
+            Test("GameplayPreviewDock_BytesLocksSpeedComboToTrack19", () =>
+            {
+                PlayerData bytes = PreviewModel(ChartFormat.TrailerRespectV, 4);
+                AddPreviewNote(bytes, 0, 0, 0, 6);
+                var speedTrack = new TrackData(19);
+                bytes.Tracks.AddTrack(speedTrack);
+                speedTrack.AddEvent(new EventData
+                {
+                    EventType = EventType.Note,
+                    Tick = 0,
+                    Attribute = 2
+                });
+
+                PlayerData pt = PreviewModel(ChartFormat.PtffDecrypted, 4);
+                AddPreviewNote(pt, 0, 0, 0, 6);
+
+                using (var dock = new GameplayPreviewForm())
+                {
+                    var speedField = typeof(GameplayPreviewForm).GetField(
+                        "_speed", BindingFlags.Instance | BindingFlags.NonPublic);
+
+                    dock.Bind(new EditorDocumentContext(bytes, "speed.bytes"));
+                    var combo = (System.Windows.Forms.ComboBox)speedField.GetValue(dock);
+                    AssertTrue(!combo.Enabled, "BYTES must lock the speed combo");
+                    AssertTrue(combo.SelectedIndex == 2, "BYTES attr 2 must select 2x");
+
+                    dock.Bind(new EditorDocumentContext(pt, "speed.pt"));
+                    AssertTrue(combo.Enabled, "PT must keep the speed combo manual");
+                }
+            });
+
+            Test("GameplayPreview_ScrollSpeedRendersWithoutThrowing", () =>
+            {
+                PlayerData model = PreviewModel(ChartFormat.PtffDecrypted, 4);
+                AddPreviewNote(model, 0, 24, 0, 6);
+                AddPreviewNote(model, 3, 96, 12, 48);
+                model.CurrentTick = 30;
+                using (var control = new GameplayPreviewControl())
+                using (var bitmap = new Bitmap(960, 540))
+                {
+                    control.Size = bitmap.Size;
+                    control.Bind(new EditorDocumentContext(model, "speed.pt"));
+                    control.SetProfile(GameplayPreviewProfile.Technika);
+                    control.ScrollSpeed = 2.0;
+                    control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+                    AssertTrue(bitmap.GetPixel(480, 270) != Color.Empty,
+                        "speed-scaled paint produced no drawable frame");
                 }
             });
 

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
+using DJMaxEditor.DJMax;
 using DJMaxEditor.Editor;
+using DJMaxEditor.Files.FormatDetection;
 using DJMaxEditor.UI;
 
 namespace DJMaxEditor.Preview
@@ -24,8 +26,15 @@ namespace DJMaxEditor.Preview
         private readonly ComboBox _scroll;
         private readonly ComboBox _fader;
         private readonly ComboBox _line;
+        private readonly ComboBox _speed;
         private readonly ComboBox _spriteSet;
         private readonly Button _browseSpriteRoot;
+
+        /// <summary>The owner-picked manual speed, remembered across binds so a
+        /// PT/TECH chart keeps the last choice instead of snapping back.</summary>
+        private int _manualSpeedIndex = 1;
+
+        private bool _updatingSpeed;
 
         /// <summary>The catalog the dropdown currently lists. Rebuilt (and the dropdown
         /// refilled) when a newly browsed asset path changes what exists; the combo's item
@@ -130,6 +139,23 @@ namespace DJMaxEditor.Preview
                 }
             };
 
+            // Chart scroll speed: BYTES charts carry theirs on Track 19 (read on
+            // bind, combo locked to the detected value); PT and TECH charts take
+            // the owner's pick here.
+            _speed = BuildEffectorCombo(new object[]
+            {
+                "1/2", "1 (DEFAULT)", "2"
+            });
+            _speed.SelectedIndexChanged += delegate
+            {
+                if (_updatingSpeed || _speed.SelectedIndex < 0)
+                {
+                    return;
+                }
+                _manualSpeedIndex = _speed.SelectedIndex;
+                _preview.ScrollSpeed = SpeedAtIndex(_speed.SelectedIndex);
+            };
+
             // The sprite set persists: the combo lists the whole catalog (AUTO
             // first, arcade sources by arcade numbering, PACKAGED last) and the
             // "…" button points the probe at an install the automatic search did
@@ -175,13 +201,20 @@ namespace DJMaxEditor.Preview
                 WrapContents = true
             };
             // Sprite set first (it persists, unlike the session effectors), then
-            // the EFFECTORS caption marks off the arcade effector group.
-            effectorRow.Controls.Add(BuildEffectorUnit("SPRITE SET", _spriteSet, 126, 28, 35, _browseSpriteRoot));
-            effectorRow.Controls.Add(BuildEffectorUnit("NOTE SIZE", _zoom, 180, 0, 44));
+            // the note-size slider; the EFFECTORS caption gets a row of its own
+            // above the arcade effector group, and the speed combo trails LINE.
+            Control spriteSetUnit = BuildEffectorUnit(
+                "SPRITE SET", _spriteSet, 126, 28, 35, _browseSpriteRoot);
+            Control noteSizeUnit = BuildEffectorUnit("NOTE SIZE", _zoom, 180, 0, 44);
+            effectorRow.Controls.Add(spriteSetUnit);
+            effectorRow.Controls.Add(noteSizeUnit);
+            effectorRow.SetFlowBreak(noteSizeUnit, true);
             effectorRow.Controls.Add(effectorsCaption);
+            effectorRow.SetFlowBreak(effectorsCaption, true);
             effectorRow.Controls.Add(BuildEffectorUnit("TimeLine", _scroll));
             effectorRow.Controls.Add(BuildEffectorUnit("NOTE FADER", _fader));
             effectorRow.Controls.Add(BuildEffectorUnit("LINE", _line));
+            effectorRow.Controls.Add(BuildEffectorUnit("SPEED", _speed));
 
             // Docking stacks children in reverse add order: title, then status,
             // then the wrapping effector row at the bottom of the header.
@@ -226,6 +259,7 @@ namespace DJMaxEditor.Preview
             SetProfile(document == null
                 ? GameplayPreviewProfile.Technika
                 : GameplayPreviewProfileResolver.Suggest(document.Model).Profile);
+            ApplyScrollSpeed(document);
         }
 
         public void ConfirmTechnikaProfile()
@@ -273,6 +307,94 @@ namespace DJMaxEditor.Preview
         {
             _preview.RefreshTopology();
             UpdateStatus();
+        }
+
+        /// <summary>
+        /// Reads the chart's scroll speed. BYTES (Respect V trailer) charts declare
+        /// theirs on Track 19: a note with attribute 1 plays at half speed, attribute 2
+        /// at double speed, and an empty or missing marker keeps the default. Every
+        /// other format answers 1 here because its speed is the owner's manual pick.
+        /// </summary>
+        internal static double DetectScrollSpeed(PlayerData model)
+        {
+            if (model == null || model.SourceFormat != ChartFormat.TrailerRespectV)
+            {
+                return 1.0;
+            }
+            TrackData speedTrack = null;
+            foreach (TrackData track in model.Tracks)
+            {
+                if (track.Idx == 19)
+                {
+                    speedTrack = track;
+                    break;
+                }
+            }
+            if (speedTrack == null)
+            {
+                return 1.0;
+            }
+            foreach (EventData marker in speedTrack.Events)
+            {
+                if (marker.EventType != EventType.Note)
+                {
+                    continue;
+                }
+                if (marker.Attribute == 1)
+                {
+                    return 0.5;
+                }
+                if (marker.Attribute == 2)
+                {
+                    return 2.0;
+                }
+                return 1.0;
+            }
+            return 1.0;
+        }
+
+        private static double SpeedAtIndex(int index)
+        {
+            switch (index)
+            {
+                case 0:
+                    return 0.5;
+                case 2:
+                    return 2.0;
+                default:
+                    return 1.0;
+            }
+        }
+
+        private static int IndexForSpeed(double speed)
+        {
+            if (speed < 0.75)
+            {
+                return 0;
+            }
+            return speed > 1.5 ? 2 : 1;
+        }
+
+        /// <summary>Applies the bound chart's speed rule: BYTES reads Track 19 and locks
+        /// the combo on the detected value; PT and TECH charts unlock it and keep the
+        /// owner's last manual pick.</summary>
+        private void ApplyScrollSpeed(EditorDocumentContext document)
+        {
+            bool auto = document != null &&
+                document.Model.SourceFormat == ChartFormat.TrailerRespectV;
+            double speed = auto ? DetectScrollSpeed(document.Model) : 1.0;
+
+            _updatingSpeed = true;
+            try
+            {
+                _speed.Enabled = !auto;
+                _speed.SelectedIndex = auto ? IndexForSpeed(speed) : _manualSpeedIndex;
+            }
+            finally
+            {
+                _updatingSpeed = false;
+            }
+            _preview.ScrollSpeed = auto ? speed : SpeedAtIndex(_manualSpeedIndex);
         }
 
         private void SetProfile(GameplayPreviewProfile profile)

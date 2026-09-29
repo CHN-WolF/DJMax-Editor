@@ -134,6 +134,26 @@ namespace DJMaxEditor.Preview
             }
         }
 
+        /// <summary>
+        /// The chart's scroll speed as a SWEEP-rate multiplier: notes never move
+        /// from their authored scan positions; the scanline crosses the field at
+        /// this many times the musical rate (BYTES attribute 1 = half, 2 = double).
+        /// Hit states, the hit flash and the approach glow measure from the sweep,
+        /// so they follow the faster line.
+        /// </summary>
+        public double ScrollSpeed
+        {
+            get { return _scrollSpeed; }
+            set
+            {
+                double clamped = Math.Max(0.25, Math.Min(4.0, value));
+                if (Math.Abs(_scrollSpeed - clamped) < 1e-9) return;
+                _scrollSpeed = clamped;
+                RefreshPlayback();
+            }
+        }
+        private double _scrollSpeed = 1.0;
+
         public string ProjectionStatus
         {
             get
@@ -188,7 +208,8 @@ namespace DJMaxEditor.Preview
             }
             else
             {
-                _frame = _projection.CreateRenderableFrame(_document.Model.CurrentTick);
+                _frame = _projection.CreateRenderableFrame(
+                    _document.Model.CurrentTick, _scrollSpeed);
             }
             Invalidate();
         }

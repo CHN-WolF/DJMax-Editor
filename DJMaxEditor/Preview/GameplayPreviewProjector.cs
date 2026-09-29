@@ -271,7 +271,7 @@ namespace DJMaxEditor.Preview
 
         public GameplayPreviewFrame CreateFrame(int currentTick)
         {
-            return CreateFrame(currentTick, false);
+            return CreateFrame(currentTick, false, 1.0);
         }
 
         /// <summary>
@@ -280,38 +280,80 @@ namespace DJMaxEditor.Preview
         /// </summary>
         public GameplayPreviewFrame CreateRenderableFrame(int currentTick)
         {
-            return CreateFrame(currentTick, true);
+            return CreateRenderableFrame(currentTick, 1.0);
         }
 
-        private GameplayPreviewFrame CreateFrame(int currentTick, bool renderableOnly)
+        /// <summary>
+        /// Creates the playback window with the chart's scroll speed applied to the
+        /// SWEEP, not the notes: every note keeps its authored scan position, and
+        /// the scanline crosses the field at this many times the musical rate - 2x
+        /// reaches notes twice as fast, 1/2x lags behind, 1 plays the plain clock.
+        /// States, the hit flash and the approach glow all measure from the sweep,
+        /// so they follow it without moving a single note.
+        /// </summary>
+        public GameplayPreviewFrame CreateRenderableFrame(int currentTick, double scrollSpeed)
+        {
+            return CreateFrame(currentTick, true, scrollSpeed);
+        }
+
+        private GameplayPreviewFrame CreateFrame(
+            int currentTick,
+            bool renderableOnly,
+            double scrollSpeed)
         {
             int ticks = Math.Max(1, (int)_ticksPerMeasure);
             double currentScan = Profile == GameplayPreviewProfile.Technika
                 ? (4.0 * currentTick) / (ticks * Math.Max(1, _beatsPerScan))
                 : currentTick / (double)ticks;
+            if (renderableOnly && Profile == GameplayPreviewProfile.Technika)
+            {
+                // Scroll speed drives the sweep: the scan position advances at this
+                // many times the musical rate. Notes never move - their scan index,
+                // relative position and X are the authored ones.
+                currentScan *= scrollSpeed;
+            }
             int currentIntScan = (int)Math.Floor(currentScan);
             double currentPhase = currentScan - currentIntScan;
             var notes = new List<ProjectedGameplayNote>(Notes.Count);
 
             foreach (ProjectedGameplayNote topology in Notes)
             {
-                if (renderableOnly && !IsInRenderableWindow(
-                    topology, currentTick, currentIntScan, ticks))
+                if (Profile == GameplayPreviewProfile.Technika)
                 {
-                    continue;
+                    double pulsesPerScan = 240.0 * Math.Max(1, _beatsPerScan);
+                    double headFloatScan = topology.Pulse / pulsesPerScan;
+                    double tailFloatScan = GameplayPreviewNoteKinds.HasHoldTrail(topology.Kind)
+                        ? (topology.Pulse + topology.DurationPulse) / pulsesPerScan
+                        : headFloatScan;
+
+                    if (renderableOnly && !IsInRenderableWindow(
+                            currentIntScan, headFloatScan, tailFloatScan))
+                    {
+                        continue;
+                    }
+                }
+                else if (renderableOnly)
+                {
+                    // Generic rendering maps two measures around the playhead into
+                    // the viewport, so notes outside that range cannot contribute
+                    // pixels.
+                    if (Math.Abs(topology.Source.Tick - currentTick) > ticks * 2)
+                    {
+                        continue;
+                    }
                 }
 
                 ProjectedGameplayNote note = topology.Copy();
                 if (Profile == GameplayPreviewProfile.Technika)
                 {
                     double pulsesPerScan = 240.0 * Math.Max(1, _beatsPerScan);
-                    double noteFloatScan = note.Pulse / pulsesPerScan;
                     // Only a hold answers for its tail: every note carries a keysound-length
                     // duration, so reading the raw tail for a tap would keep it lit behind
                     // the sweep until its sample "ends". A tap is Resolved the instant the
                     // sweep clears its head.
-                    double endFloatScan = GameplayPreviewNoteKinds.HasHoldTrail(note.Kind)
-                        ? (note.Pulse + note.DurationPulse) / pulsesPerScan
+                    double noteFloatScan = topology.Pulse / pulsesPerScan;
+                    double endFloatScan = GameplayPreviewNoteKinds.HasHoldTrail(topology.Kind)
+                        ? (topology.Pulse + topology.DurationPulse) / pulsesPerScan
                         : noteFloatScan;
                     double distance = currentScan - noteFloatScan;
 
@@ -323,18 +365,18 @@ namespace DJMaxEditor.Preview
                         // the handover.
                         note.State = GameplayPreviewNoteState.Resolved;
                     }
-                    else if (note.ScanIndex < currentIntScan)
+                    else if (topology.ScanIndex < currentIntScan)
                     {
                         // Head behind, tail still ahead: a hold spanning into this scan or
                         // the next. It is still being played, so Active - the renderer draws
                         // the visible scans' worth of its body and skips the head it passed.
                         note.State = GameplayPreviewNoteState.Active;
                     }
-                    else if (note.ScanIndex == currentIntScan)
+                    else if (topology.ScanIndex == currentIntScan)
                     {
                         note.State = GameplayPreviewNoteState.Active;
                     }
-                    else if (note.ScanIndex == currentIntScan + 1)
+                    else if (topology.ScanIndex == currentIntScan + 1)
                     {
                         note.State = currentPhase >= 0.875
                             ? GameplayPreviewNoteState.Active
@@ -345,6 +387,8 @@ namespace DJMaxEditor.Preview
                         note.State = GameplayPreviewNoteState.Inactive;
                     }
 
+                    // The approach glow measures from the (possibly sped-up) sweep,
+                    // so it fires as the faster line closes on the note.
                     note.ApproachScanDistance = distance;
                     note.ApproachVisible = distance >= -0.5 && distance <= 0;
                     note.ApproachProgress = note.ApproachVisible
@@ -369,33 +413,22 @@ namespace DJMaxEditor.Preview
         }
 
         private bool IsInRenderableWindow(
-            ProjectedGameplayNote note,
-            int currentTick,
             int currentIntScan,
-            int ticks)
+            double headFloatScan,
+            double tailFloatScan)
         {
-            if (Profile == GameplayPreviewProfile.Technika)
-            {
-                // The Technika renderer draws this scan plus the one already waiting on
-                // the other half - two float scans on stage. A hold belongs to the window
-                // while any part of its span intersects them: its head may be scans behind
-                // while its tail is still ahead, and testing the head alone is what clipped
-                // a long hold at the scan past it. The far edge sits at the start of the
-                // scan AFTER the waiting one (float scan current+2); an edge at current+1
-                // admitted only notes exactly on the handover boundary. Taps answer for
-                // their head alone (see CreateFrame for why the raw duration is not a tail).
-                double pulsesPerScan = 240.0 * Math.Max(1, _beatsPerScan);
-                double headFloatScan = note.Pulse / pulsesPerScan;
-                double tailFloatScan = GameplayPreviewNoteKinds.HasHoldTrail(note.Kind)
-                    ? (note.Pulse + note.DurationPulse) / pulsesPerScan
-                    : headFloatScan;
-                return tailFloatScan >= currentIntScan &&
-                    headFloatScan < currentIntScan + 2;
-            }
-
-            // Generic rendering maps two measures around the playhead into the
-            // viewport, so notes outside that range cannot contribute pixels.
-            return Math.Abs(note.Source.Tick - currentTick) <= ticks * 2;
+            // The Technika renderer draws this scan plus the one already waiting on
+            // the other half - two float scans on stage. A hold belongs to the window
+            // while any part of its span intersects them: its head may be scans behind
+            // while its tail is still ahead, and testing the head alone is what clipped
+            // a long hold at the scan past it. The far edge sits at the start of the
+            // scan AFTER the waiting one (float scan current+2); an edge at current+1
+            // admitted only notes exactly on the handover boundary. Taps answer for
+            // their head alone (see CreateFrame for why the raw duration is not a tail).
+            // currentIntScan is where the (possibly sped-up) sweep currently is, so a
+            // faster sweep stages notes further along the chart, a slower one earlier.
+            return tailFloatScan >= currentIntScan &&
+                headFloatScan < currentIntScan + 2;
         }
     }
 
